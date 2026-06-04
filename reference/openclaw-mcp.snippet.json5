@@ -1,0 +1,21 @@
+// 复制到 ~/.openclaw/openclaw.json 的 mcp.servers 中（路径改成你本机绝对路径）
+// 详见：https://docs.openclaw.ai/gateway/configuration-reference （MCP 章节）
+
+{
+  mcp: {
+    servers: {
+      lifecare: {
+        command: "python",
+        args: [
+          "D:/projects/meituan hackathon/meituan-lifecare-agent/run_mcp.py",
+        ],
+        // OpenClaw 会拦截 MCP stdio 的 PYTHONPATH；用 cwd 即可 import lifecare
+        cwd: "D:/projects/meituan hackathon/meituan-lifecare-agent",
+        env: {
+          // 也可在此重复放 AMAP_KEY，避免子进程读不到 .env
+          // LIFECARE_MCP_TOOL_LOG: "0",  // 默认会写 benchmark/results/mcp_tool_calls.jsonl；设为 0 关闭
+        },
+      },
+    },
+  },
+}

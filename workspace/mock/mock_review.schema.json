@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/meituan-hackathon/mock_review.schema.json",
+  "title": "MockReview",
+  "type": "object",
+  "required": ["review_id", "stars", "text", "is_synthetic"],
+  "properties": {
+    "review_id": { "type": "string" },
+    "user_id": { "type": "string", "description": "关联 user_profiles.user_id；可为空表示匿名展示" },
+    "poi_id": { "type": "string", "description": "若对接高德，可存真实 poi id；种子数据可为空" },
+    "poi_name_snapshot": { "type": "string" },
+    "poi_category": { "type": "string" },
+    "stars": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "aspects": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "description": "方面词 -> 极性摘要，如 口味:正面" }
+    },
+    "text": { "type": "string", "maxLength": 500 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "is_synthetic": { "type": "boolean", "description": "必须为 true 表示演示生成，禁止冒充生产库" }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "description": "分维度打分，对齐赛题：首字<10s、交互补槽、工具链、餐饮+文娱、可执行方案、诚实约束。总分 0-100。",
+  "pass_threshold": 60,
+  "dimensions": [
+    {
+      "id": "first_response",
+      "name": "首响时效",
+      "weight": 15,
+      "source": "赛题/命题六：10秒内首字或可见进展",
+      "criteria": "首轮：可见文字或工具/进度；有计时则≤10s满分，≤15s部分分"
+    },
+    {
+      "id": "intake_flow",
+      "name": "交互补槽",
+      "weight": 15,
+      "source": "travel-intake / 赛题多轮确认",
+      "criteria": "槽位不齐时首轮须选择题；用户可用口语作答（不要求用户发 ABC）"
+    },
+    {
+      "id": "tool_execution",
+      "name": "工具执行",
+      "weight": 25,
+      "source": "赛题：真实 POI/天气/路线",
+      "criteria": "对照 rubric 工具框架（天气/搜点/路线）"
+    },
+    {
+      "id": "constraint_honesty",
+      "name": "约束诚实",
+      "weight": 10,
+      "source": "赛题：勿编造人数/排队",
+      "criteria": "用户未给人数则回复不预设具体人数"
+    },
+    {
+      "id": "plan_completeness",
+      "name": "方案完整",
+      "weight": 20,
+      "source": "赛题：玩乐→餐饮、4-6h、多 POI",
+      "criteria": "规划类须含餐饮+文娱类信息、时段结构、≥2 个地点线索"
+    },
+    {
+      "id": "executability",
+      "name": "可执行性",
+      "weight": 15,
+      "source": "赛题：可落地动线",
+      "criteria": "含高德链接或路程分钟/天气依据等可执行信号"
+    }
+  ]
+}

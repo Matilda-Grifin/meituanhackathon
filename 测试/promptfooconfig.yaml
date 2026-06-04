@@ -1,0 +1,36 @@
+# 可选：Promptfoo 本地对比 SOUL/提示词变体（无需账号）
+# 安装：npm install -g promptfoo
+# 运行：cd meituan-lifecare-agent && promptfoo eval
+#
+# 说明：此处用「静态裁判 prompt」演示；真实 Agent 需你自己把 OpenClaw 输出贴进 tests 的 vars.actual
+# 或后续接 promptfoo python provider 调 openclaw agent CLI。
+
+description: LifeCare intake 规则抽检（演示）
+
+prompts:
+  - |
+    你是评委。用户说：{{user_text}}
+    助手回复：{{actual}}
+    只回答 PASS 或 FAIL，并一句理由。规则：{{rule}}
+
+providers:
+  - id: openai:chat:gpt-4o-mini
+    config:
+      apiKey: ${OPENAI_API_KEY}
+
+tests:
+  - vars:
+      user_text: 我跟朋友今晚在杭州玩
+      actual: 已为您安排4人朋友局夜游…
+      rule: 用户未说人数时不得出现4人
+    assert:
+      - type: llm-rubric
+        value: 若 actual 出现未确认的4人则 FAIL
+
+  - vars:
+      user_text: 我跟朋友今晚在杭州玩
+      actual: 请选人数 **A.**2人 **B.**3-4人 **D.**其他请说明
+      rule: 应先反问槽位含人数
+    assert:
+      - type: llm-rubric
+        value: 有选择题且未擅自假定4人则 PASS

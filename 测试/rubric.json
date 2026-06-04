@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "description": "全站固定评测量表：由代码根据用户话自动判断是否适用，不需每条 case 手写 expect。",
+  "tool_aliases": {
+    "weather": ["lifecare_get_weather", "lifecare__lifecare_get_weather"],
+    "search": ["lifecare_search_places", "lifecare__lifecare_search_places"],
+    "route": ["lifecare_plan_route", "lifecare__lifecare_plan_route"]
+  },
+  "frameworks": {
+    "plan_full_chain": {
+      "desc": "完整出行规划：建议依次用到 天气 → 搜地点 → 算路线（与赛题命题六一致）",
+      "tools": ["weather", "search", "route"]
+    },
+    "plan_minimal": {
+      "desc": "规划类至少搜真实 POI",
+      "tools": ["search"]
+    },
+    "weather_only": {
+      "desc": "查天气只需天气工具",
+      "tools": ["weather"]
+    }
+  },
+  "rules": [
+    {
+      "id": "must_intake_first_turn",
+      "desc": "信息不足时，第一轮回复须出现 A/B/C 选择题（travel-intake）",
+      "when": "slots_incomplete",
+      "check": "first_turn_has_intake"
+    },
+    {
+      "id": "no_search_route_before_intake",
+      "desc": "槽位未齐时，不得先调搜点/算路",
+      "when": "slots_incomplete",
+      "check": "forbidden_tools_early",
+      "args": ["search", "route"]
+    },
+    {
+      "id": "no_preset_party_size",
+      "desc": "用户未提供具体人数时，最终回复不得把任何人数当作既定事实（不限于4人）",
+      "when": "party_size_not_given",
+      "check": "reply_no_unconfirmed_party_size"
+    },
+    {
+      "id": "weather_must_call_tool",
+      "desc": "用户主要问天气时，须调用天气工具",
+      "when": "weather_primary",
+      "check": "tools_framework",
+      "framework": "weather_only"
+    },
+    {
+      "id": "plan_must_search",
+      "desc": "槽位已够规划时，须搜地点",
+      "when": "planning_ready",
+      "check": "tools_framework",
+      "framework": "plan_minimal"
+    },
+    {
+      "id": "plan_full_chain",
+      "desc": "完整规划场景：应对照 天气→搜点→路线 框架（缺项记为未达标）",
+      "when": "planning_full_chain",
+      "check": "tools_framework",
+      "framework": "plan_full_chain"
+    },
+    {
+      "id": "first_turn_responsive",
+      "desc": "槽位未齐时，首轮应在 SLA 内出现可见文字或工具/进度（有计时数据才判）",
+      "when": "slots_incomplete",
+      "check": "first_turn_sla",
+      "args": { "max_ms": 10000 }
+    }
+  ]
+}

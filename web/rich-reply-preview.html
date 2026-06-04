@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>选项 + Markdown 图 · 版式预览（黑客松）</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 1rem; line-height: 1.55; }
+    h1 { font-size: 1.15rem; }
+    textarea { width: 100%; min-height: 220px; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: 13px; }
+    #out { margin-top: 1rem; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; background: #fafafa; }
+    #out img { max-width: 100%; height: auto; border-radius: 6px; }
+    .hint { color: #555; font-size: 0.9rem; margin: 0.5rem 0 1rem; }
+    button { padding: 0.45rem 0.9rem; margin-right: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>选项 + 图 · 版式预览（不连网关）</h1>
+  <p class="hint">
+    用途：把 OpenClaw 里<strong>助手原文</strong>粘贴到下面，用 marked 渲染，验收「选项 / 表格 / 图片」在浏览器里的观感。
+    正式对话仍用 OpenClaw；若 Control UI 对 Markdown 支持弱，可把本页效果当作「希望模型排成什么样」的对照，并已在 <code>SOUL.md</code> 里加了<strong>换行与加粗</strong>约定。
+  </p>
+  <textarea id="src" spellcheck="false">请先帮我确认几件事（任选一项回复字母即可）：
+
+**A.** 半天（约 4 小时）  
+**B.** 全天  
+**C.** 两天一夜  
+
+出发地默认用杭州；若不对请直接说城市名。
+
+---
+
+下面是一张示例图（需可访问的 https 图片 URL 才显示）：
+
+![](https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Generic_Camera_Icon.svg/200px-Generic_Camera_Icon.svg.png)
+
+| 时段 | 安排 |
+|------|------|
+| 上午 | 博物馆 |
+| 中午 | 本帮菜 |
+</textarea>
+  <p>
+    <button type="button" id="render">渲染</button>
+    <button type="button" id="sample">填入示例</button>
+  </p>
+  <div id="out"></div>
+  <script>
+    var SAMPLE = document.getElementById("src").value;
+    function render() {
+      var t = document.getElementById("src").value;
+      document.getElementById("out").innerHTML = marked.parse(t, { breaks: true, gfm: true });
+    }
+    document.getElementById("render").addEventListener("click", render);
+    document.getElementById("sample").addEventListener("click", function () {
+      document.getElementById("src").value = SAMPLE;
+      render();
+    });
+    render();
+  </script>
+</body>
+</html>

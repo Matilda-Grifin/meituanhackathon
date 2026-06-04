@@ -1,0 +1,56 @@
+diff --git a/node_modules/openclaw-ws/dist/client.js b/node_modules/openclaw-ws/dist/client.js
+index c92e942..c2752aa 100644
+--- a/node_modules/openclaw-ws/dist/client.js
++++ b/node_modules/openclaw-ws/dist/client.js
+@@ -97,7 +97,13 @@ export class GatewayBrowserClient {
+         // Over plain HTTP, we skip device identity and fall back to token-only auth.
+         // Gateways may reject this unless gateway.controlUi.allowInsecureAuth is enabled.
+         const isSecureContext = typeof crypto !== "undefined" && !!crypto.subtle;
+-        const scopes = ["operator.admin", "operator.approvals", "operator.pairing"];
++        const scopes = [
++            "operator.read",
++            "operator.write",
++            "operator.admin",
++            "operator.approvals",
++            "operator.pairing",
++        ];
+         const role = "operator";
+         let deviceIdentity = null;
+         let canFallbackToShared = false;
+@@ -142,7 +148,7 @@ export class GatewayBrowserClient {
+         }
+         const params = {
+             minProtocol: 3,
+-            maxProtocol: 3,
++            maxProtocol: 5,
+             client: {
+                 id: this.opts.clientName ?? GATEWAY_CLIENT_NAMES.CONTROL_UI,
+                 version: this.opts.clientVersion ?? "dev",
+diff --git a/node_modules/openclaw-ws/src/client.ts b/node_modules/openclaw-ws/src/client.ts
+index f0f2378..a1c2f58 100644
+--- a/node_modules/openclaw-ws/src/client.ts
++++ b/node_modules/openclaw-ws/src/client.ts
+@@ -176,7 +176,13 @@ export class GatewayBrowserClient {
+     // Gateways may reject this unless gateway.controlUi.allowInsecureAuth is enabled.
+     const isSecureContext = typeof crypto !== "undefined" && !!crypto.subtle;
+ 
+-    const scopes = ["operator.admin", "operator.approvals", "operator.pairing"];
++    const scopes = [
++      "operator.read",
++      "operator.write",
++      "operator.admin",
++      "operator.approvals",
++      "operator.pairing",
++    ];
+     const role = "operator";
+     let deviceIdentity: Awaited<ReturnType<typeof loadOrCreateDeviceIdentity>> | null = null;
+     let canFallbackToShared = false;
+@@ -233,7 +239,7 @@ export class GatewayBrowserClient {
+     }
+     const params = {
+       minProtocol: 3,
+-      maxProtocol: 3,
++      maxProtocol: 5,
+       client: {
+         id: this.opts.clientName ?? GATEWAY_CLIENT_NAMES.CONTROL_UI,
+         version: this.opts.clientVersion ?? "dev",

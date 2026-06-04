@@ -1,0 +1,94 @@
+{
+  "version": "2026-06-02-v2",
+  "description": "6 模型 × 单轮/多轮固定 50 条选型测评",
+  "datasets": {
+    "singleturn": {
+      "path": "eval_cases/full/单轮测试集.json",
+      "remote_path": "eval_cases/full/singleturn_fixed50.json",
+      "cases": 50,
+      "difficulty_ratio": {"easy": 0.3, "medium": 0.5, "hard": 0.2}
+    },
+    "multiturn": {
+      "path": "eval_cases/full/多轮测试集.json",
+      "remote_path": "eval_cases/full/multiturn_fixed50.json",
+      "judge_path": "model_selection/judge/multiturn_judge.json",
+      "local_judge_path": "模型选型/judge/multiturn_judge.json",
+      "cases": 50,
+      "difficulty_ratio": {"easy": 0.3, "medium": 0.5, "hard": 0.2},
+      "max_turns": 6,
+      "sim_mode": "auto"
+    }
+  },
+  "models": [
+    {"alias": "doubao", "label": "豆包 mini 260428", "provider": "volcark", "switch_cmd": "doubao", "needs_proxy": false, "group": "domestic"},
+    {"alias": "deepseek", "label": "DeepSeek V4 Flash", "provider": "openrouter", "model_id": "deepseek/deepseek-v4-flash", "switch_cmd": "deepseek", "needs_proxy": true, "group": "domestic"},
+    {"alias": "qwen", "label": "Qwen 3.6 Plus", "provider": "dashscope", "switch_cmd": "qwen", "needs_proxy": false, "group": "domestic"},
+    {"alias": "gemini", "label": "Gemini 3 Flash", "provider": "openrouter", "model_id": "google/gemini-3-flash-preview", "switch_cmd": "gemini", "needs_proxy": true, "group": "overseas"},
+    {"alias": "claude", "label": "Claude Opus 4.7", "provider": "openrouter", "model_id": "anthropic/claude-opus-4.7", "switch_cmd": "claude", "needs_proxy": true, "group": "overseas"},
+    {"alias": "gpt", "label": "GPT-5.5", "provider": "openrouter", "model_id": "openai/gpt-5.5", "switch_cmd": "gpt", "needs_proxy": true, "group": "overseas"}
+  ],
+  "ecs": {
+    "host": "root@121.41.81.58",
+    "repo_path": "/root/meituan-lifecare-agent",
+    "bench_path": "/root/meituan-lifecare-agent/benchmark",
+    "selection_subdir": "model_selection"
+  },
+  "hidden_holdout": {
+    "path": "eval_cases/full/隐藏卷_15条.json",
+    "cases": 15,
+    "note": "从未参与固定 50 条选型考卷；全量结束后对入围 1～2 个模型各跑一次，防刷题"
+  },
+  "stability_subset": {
+    "config_path": "模型选型/stability_subset.json",
+    "note": "10 条难题 × 每模型 3 遍，用 aggregate_stability.py 汇总"
+  },
+  "benchmark": {
+    "resume_flag": "--resume",
+    "note": "多轮/单轮采集断点续跑：同一 run-id 下 pred 已有 case_id 则跳过；OOM 废数据请先 mv 为 .bak"
+  },
+  "eval": {
+    "temperature_note": "测试期间固定 temperature=0.3，仅改 model",
+    "timeout_s": 180,
+    "pass_thresholds": {
+      "task_success_rate_pct": 70,
+      "avg_total_score": 60,
+      "multiturn_history_constraint_rate": 0.85,
+      "multiturn_followup_efficiency_rate": 0.80,
+      "multiturn_replan_success_rate": 0.75,
+      "multiturn_tool_compliance_rate": 0.90,
+      "multiturn_execution_rate": 0.70
+    }
+  },
+  "report": {
+    "title": "美团本地生活 Agent · 模型选型测评报告",
+    "reference": "VitaBench 论文图表结构（Table 3 / Fig 5 / Fig 7 / Fig 9）",
+    "domains": ["easy", "medium", "hard"],
+    "metrics": ["avg_score", "pass_rate", "task_success_rate"]
+  },
+  "output_dir": "模型选型/results",
+  "v63": {
+    "pipeline": "vitabench_eval",
+    "tasks_dir": "../../../待修复/模型选型评测/data/tasks",
+    "tasks_remote_dir": "eval_cases/vitabench/tasks",
+    "manifest_path": "../../../待修复/模型选型评测/data/manifest.json",
+    "orchestrator": {
+      "max_steps": 100,
+      "max_errors": 10,
+      "agent_timeout_s": 420
+    },
+    "llm": {
+      "user_simulator": {"env_model": "user_llm_model", "temperature": 0.6},
+      "evaluator": {"env_model": "judge_llm_model", "temperature": 0.1}
+    },
+    "agent_eval": {
+      "temperature": 0.0,
+      "thinking": "medium",
+      "note": "ECS via V63_EVAL_TEMPERATURE / V63_EVAL_THINKING in ecs_switch_model.py"
+    },
+    "metrics": {
+      "first_response_pass_threshold": 70,
+      "partial_success_reward_threshold": 0.8
+    },
+    "legacy_datasets_note": "singleturn/multiturn 为 6.2，6.3 主路径用 tasks manifest"
+  }
+}

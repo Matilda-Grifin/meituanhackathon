@@ -1,0 +1,2767 @@
+[
+  {
+    "case_id": 6,
+    "source_case_id": 6,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "上海",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 11,
+    "source_case_id": 11,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "杭州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 22,
+    "source_case_id": 22,
+    "difficulty": "hard",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "city",
+          "value": "杭州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 4,
+        "must_not_repeat_slots": true,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "我们临时改了同行人结构，请根据新成员重新规划。",
+          "预算下调并限制返程时间，请保留已确认的核心偏好。",
+          "如果第一站不可行请触发重规划，不要重复追问已给信息。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": [
+        "repeat_same_intake_question"
+      ]
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 25,
+    "source_case_id": 25,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "杭州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 27,
+    "source_case_id": 27,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "杭州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 46,
+    "source_case_id": 46,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "宁波",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 55,
+    "source_case_id": 55,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 81,
+    "source_case_id": 81,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "郑州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 107,
+    "source_case_id": 107,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 120,
+    "source_case_id": 120,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 124,
+    "source_case_id": 124,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "广州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 129,
+    "source_case_id": 129,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "武汉",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 135,
+    "source_case_id": 135,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 139,
+    "source_case_id": 139,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "佛山",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 159,
+    "source_case_id": 159,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "武汉",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 162,
+    "source_case_id": 162,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 163,
+    "source_case_id": 163,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "child_age",
+          "value": 8,
+          "match": "number_in_output"
+        },
+        {
+          "key": "city",
+          "value": "三亚",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 173,
+    "source_case_id": 173,
+    "difficulty": "easy",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 300,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "兰州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 2,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "补充一下预算控制在300以内，优先交通方便的地点。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 198,
+    "source_case_id": 198,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "东莞",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 200,
+    "source_case_id": 200,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "合肥",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 202,
+    "source_case_id": 202,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "昆明",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 231,
+    "source_case_id": 231,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "郑州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 238,
+    "source_case_id": 238,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "桂林",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 245,
+    "source_case_id": 245,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "深圳",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 252,
+    "source_case_id": 252,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "厦门",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 255,
+    "source_case_id": 255,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "大连",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 262,
+    "source_case_id": 262,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "昆明",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 271,
+    "source_case_id": 271,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "杭州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 285,
+    "source_case_id": 285,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "大连",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 318,
+    "source_case_id": 318,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "东莞",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 319,
+    "source_case_id": 319,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "佛山",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 331,
+    "source_case_id": 331,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 8000,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "杭州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 350,
+    "source_case_id": 350,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "合肥",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 352,
+    "source_case_id": 352,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "昆明",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 368,
+    "source_case_id": 368,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "南京",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 370,
+    "source_case_id": 370,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "西安",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 378,
+    "source_case_id": 378,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "东莞",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 383,
+    "source_case_id": 383,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "兰州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 386,
+    "source_case_id": 386,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "福州",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 387,
+    "source_case_id": 387,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "budget_max",
+          "value": 12000,
+          "match": "lte_in_output"
+        },
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "南宁",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 397,
+    "source_case_id": 397,
+    "difficulty": "medium",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "venue_type",
+          "value": "indoor",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "diet",
+          "value": "no_spicy",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "transport",
+          "value": "convenient",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "city",
+          "value": "重庆",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "backup_plan",
+          "value": true,
+          "match": "backup_plan_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 3,
+        "must_not_repeat_slots": false,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "天气变化了，若下雨请改成室内方案并减少折返。",
+          "最后输出主方案和一个备选方案。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": []
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 426,
+    "source_case_id": 426,
+    "difficulty": "hard",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 4,
+        "must_not_repeat_slots": true,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "我们临时改了同行人结构，请根据新成员重新规划。",
+          "预算下调并限制返程时间，请保留已确认的核心偏好。",
+          "如果第一站不可行请触发重规划，不要重复追问已给信息。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": [
+        "repeat_same_intake_question"
+      ]
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 443,
+    "source_case_id": 443,
+    "difficulty": "hard",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "city",
+          "value": "太原",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 4,
+        "must_not_repeat_slots": true,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "我们临时改了同行人结构，请根据新成员重新规划。",
+          "预算下调并限制返程时间，请保留已确认的核心偏好。",
+          "如果第一站不可行请触发重规划，不要重复追问已给信息。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": [
+        "repeat_same_intake_question"
+      ]
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 444,
+    "source_case_id": 444,
+    "difficulty": "hard",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 4,
+        "must_not_repeat_slots": true,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "我们临时改了同行人结构，请根据新成员重新规划。",
+          "预算下调并限制返程时间，请保留已确认的核心偏好。",
+          "如果第一站不可行请触发重规划，不要重复追问已给信息。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": [
+        "repeat_same_intake_question"
+      ]
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 445,
+    "source_case_id": 445,
+    "difficulty": "hard",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "city",
+          "value": "济南",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 4,
+        "must_not_repeat_slots": true,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "我们临时改了同行人结构，请根据新成员重新规划。",
+          "预算下调并限制返程时间，请保留已确认的核心偏好。",
+          "如果第一站不可行请触发重规划，不要重复追问已给信息。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": [
+        "repeat_same_intake_question"
+      ]
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 448,
+    "source_case_id": 448,
+    "difficulty": "hard",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "city",
+          "value": "桂林",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 4,
+        "must_not_repeat_slots": true,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "我们临时改了同行人结构，请根据新成员重新规划。",
+          "预算下调并限制返程时间，请保留已确认的核心偏好。",
+          "如果第一站不可行请触发重规划，不要重复追问已给信息。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": [
+        "repeat_same_intake_question"
+      ]
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 454,
+    "source_case_id": 454,
+    "difficulty": "hard",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 4,
+        "must_not_repeat_slots": true,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "我们临时改了同行人结构，请根据新成员重新规划。",
+          "预算下调并限制返程时间，请保留已确认的核心偏好。",
+          "如果第一站不可行请触发重规划，不要重复追问已给信息。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": [
+        "repeat_same_intake_question"
+      ]
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 457,
+    "source_case_id": 457,
+    "difficulty": "hard",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "city",
+          "value": "南京",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 4,
+        "must_not_repeat_slots": true,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "我们临时改了同行人结构，请根据新成员重新规划。",
+          "预算下调并限制返程时间，请保留已确认的核心偏好。",
+          "如果第一站不可行请触发重规划，不要重复追问已给信息。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": [
+        "repeat_same_intake_question"
+      ]
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 494,
+    "source_case_id": 494,
+    "difficulty": "hard",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "city",
+          "value": "青岛",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 4,
+        "must_not_repeat_slots": true,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "我们临时改了同行人结构，请根据新成员重新规划。",
+          "预算下调并限制返程时间，请保留已确认的核心偏好。",
+          "如果第一站不可行请触发重规划，不要重复追问已给信息。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": [
+        "repeat_same_intake_question"
+      ]
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  },
+  {
+    "case_id": 499,
+    "source_case_id": 499,
+    "difficulty": "hard",
+    "expected_behavior": {
+      "history_constraints_required": [
+        {
+          "key": "city",
+          "value": "合肥",
+          "match": "keyword_in_output"
+        },
+        {
+          "key": "executable_plan",
+          "value": true,
+          "match": "time_blocks_in_output"
+        }
+      ],
+      "followup_policy": {
+        "scripted_followups": 4,
+        "must_not_repeat_slots": true,
+        "allow_clarification_before_script": true
+      },
+      "replan_policy": {
+        "replan_required_when": [
+          "我们临时改了同行人结构，请根据新成员重新规划。",
+          "预算下调并限制返程时间，请保留已确认的核心偏好。",
+          "如果第一站不可行请触发重规划，不要重复追问已给信息。"
+        ],
+        "success_criteria": [
+          "assistant_text_changed",
+          "constraints_still_satisfied"
+        ]
+      },
+      "execution_success_criteria": [
+        "task_success_from_rubric"
+      ]
+    },
+    "must_not": {
+      "forbidden_actions": [
+        "repeat_same_intake_question"
+      ]
+    },
+    "pass_thresholds": {
+      "history_constraint_rate": 0.85,
+      "followup_efficiency_rate": 0.8,
+      "replan_success_rate": 0.75
+    }
+  }
+]

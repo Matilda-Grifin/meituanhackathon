@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>进入对话…</title>
+  <style>
+    body { font-family: system-ui, sans-serif; text-align: center; padding: 3rem 1rem; color: #333; }
+    a { color: #0b57d0; }
+  </style>
+  <script>
+    /**
+     * 【部署前只改这里】评委打开本页应直达 OpenClaw 聊天，无需再填表。
+     * 条件：该地址在浏览器里能直接打开 Control UI（通常与网关同源的 https://域名/ 或 http://IP:18789/）。
+     * 若网关只监听 127.0.0.1，请先用 Nginx 反代到公网，再把下面改成公网 HTTPS 根地址。
+     * 需要 token 时：在 URL 后加 fragment，例 "#token=你的token"（不要提交到仓库）。
+     */
+    var OPENCLAW_HOME = "http://127.0.0.1:18789";
+    var AUTH_FRAGMENT = "";
+
+    var target = OPENCLAW_HOME.replace(/\/$/, "") + "/" + (AUTH_FRAGMENT || "");
+    try {
+      window.location.replace(target);
+    } catch (e) {
+      document.write("<p>无法自动跳转，请<a href=\"" + target + "\">点此进入对话</a></p>");
+    }
+  </script>
+</head>
+<body>
+  <p>正在进入对话…</p>
+  <p><noscript>请<a id="link" href="http://127.0.0.1:18789/">点此进入</a>（需启用 JavaScript 自动跳转）</noscript></p>
+</body>
+</html>

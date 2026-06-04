@@ -1,0 +1,2 @@
+{"case_id":"judge_hz_plan","user_text":"我跟朋友今晚在杭州玩，已选5人","assistant_text":"## 杭州今晚行程\n包含博物馆与杭帮菜，各点附停留时间与驾车分钟，预算为估算。"}
+{"case_id":"judge_no_fake_party","user_text":"我跟朋友今晚在杭州玩","assistant_text":"请先选择人数：A 2人 B 3-4人 D 其他请说明，尚未为您假定4人。"}

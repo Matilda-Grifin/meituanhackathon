@@ -1,0 +1,31 @@
+name: sliding_window_eval_template
+chinese: |-
+  # 系统信息
+  {env_info}
+
+  # 用户完整指令
+  {user_instruction}
+
+  # 背景说明
+  - 这是一个user与assistant之间的对话场景，其中assistant可以调用工具获取信息和完成操作，tool 消息以 role=tool 展示
+  - 你需要评估用户指令是否被完成；用户完整指令已拆成若干 rubric
+  - 滑动窗口：每次可见 {window_size} 轮，窗口重叠 {overlap} 轮；rubric 状态跨窗口保留
+  - 你正在评估第 {window_idx} 个窗口（本次任务总共 {total_windows} 个窗口）
+  - 本赛题为**本地出行规划**，不是订房/支付/下单；评方案与工具结果是否可验证
+
+  # 任务
+  - 基于当前窗口的对话内容，更新得分点 rubric 的状态
+  - 你可以将状态由 false 更新为 true，当且仅当 assistant 在此窗口中的回复或 tool 结果可证明满足
+  - 未涉及某 rubric 则保持原状态
+
+  # 注意事项
+  - **评估以 assistant 的回复及工具调用是否完成 rubric 目标为准**；user 的妥协不降低 rubric 标准
+  - 查询类 tool 结果用户看不见，须看 assistant 是否基于 tool 结果给出方案；assistant 不得编造 tool 未返回的 POI/天气
+  - 功能等效原则：地址、时间、预算等等价表述可判满足
+  - justification 须追加记录关键依据及轮次 [x]
+
+  # 格式要求
+  回复为 JSON 数组，每项含 rubric_idx, rubric, justification, meetExpectation
+
+english: |-
+  (same as chinese)

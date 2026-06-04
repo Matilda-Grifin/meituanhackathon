@@ -1,0 +1,37 @@
+=== gateway (full tree if exists) ===
+{
+  "port": 18789,
+  "mode": "local",
+  "bind": "loopback",
+  "auth": {
+    "mode": "token",
+    "token": "__OPENCLAW_REDACTED__"
+  },
+  "tailscale": {
+    "mode": "off",
+    "resetOnExit": false
+  },
+  "nodes": {
+    "denyCommands": [
+      "camera.snap",
+      "camera.clip",
+      "screen.record",
+      "calendar.add",
+      "contacts.add",
+      "reminders.add"
+    ]
+  }
+}
+
+=== gateway.auth ===
+{
+  "mode": "token",
+  "token": "__OPENCLAW_REDACTED__"
+}
+
+=== gateway.bind / mode / port hints ===
+loopback
+local
+
+=== gateway.controlUi ===
+Config path not found: gateway.controlUi

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/meituan-hackathon/user_profile.schema.json",
+  "title": "MockUserProfile",
+  "type": "object",
+  "required": ["user_id", "nickname", "age", "gender", "home_city", "consumption_tier"],
+  "properties": {
+    "user_id": { "type": "string", "description": "演示用唯一 id，勿与真实账号混用" },
+    "nickname": { "type": "string" },
+    "age": { "type": "integer", "minimum": 12, "maximum": 90 },
+    "gender": { "type": "string", "enum": ["male", "female", "unspecified"] },
+    "city_tier": { "type": "integer", "minimum": 1, "maximum": 5, "description": "1一线 2新一线 依团队定义" },
+    "home_city": { "type": "string" },
+    "occupation_tags": { "type": "array", "items": { "type": "string" } },
+    "household": {
+      "type": "object",
+      "properties": {
+        "adults": { "type": "integer" },
+        "children": { "type": "integer" },
+        "child_ages": { "type": "array", "items": { "type": "integer" } },
+        "lives_with_parents": { "type": "boolean" }
+      }
+    },
+    "consumption_tier": { "type": "string", "enum": ["saving", "value", "premium"] },
+    "price_sensitivity": { "type": "string", "enum": ["low", "medium", "high"] },
+    "dietary_restrictions": { "type": "array", "items": { "type": "string" } },
+    "taste_tags": { "type": "array", "items": { "type": "string" } },
+    "travel_style": {
+      "type": "object",
+      "properties": {
+        "pace": { "type": "string", "enum": ["relaxed", "packed"] },
+        "radius_km_preference": { "type": "number" },
+        "dislike_long_queues": { "type": "boolean" }
+      }
+    },
+    "preferred_poi_mix": {
+      "type": "object",
+      "properties": {
+        "dining_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+        "culture_ent_ratio": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "history_summary": { "type": "string", "description": "一行摘要供 LLM 快速读入" }
+  }
+}
