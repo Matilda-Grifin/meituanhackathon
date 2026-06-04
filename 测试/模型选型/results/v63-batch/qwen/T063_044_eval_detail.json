@@ -1,0 +1,10 @@
+{
+  "task_id": "T063_044",
+  "termination": "agent_error",
+  "reward": 0.0,
+  "rubric_states": null,
+  "first_response": {
+    "score": 75,
+    "reason": "progress_no_timing"
+  }
+}

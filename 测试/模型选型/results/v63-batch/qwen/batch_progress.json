@@ -1,0 +1,445 @@
+[
+  {
+    "task_id": "T063_SAMPLE_001",
+    "ok": true,
+    "termination": "agent_error",
+    "steps": 44,
+    "reward": 0.0,
+    "rubric_met": null,
+    "rubric_total": null
+  },
+  {
+    "task_id": "T063_002",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 2,
+    "reward": 0.625,
+    "rubric_met": 5,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_003",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 4,
+    "reward": 0.875,
+    "rubric_met": 7,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_004",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 6,
+    "reward": 1.0,
+    "rubric_met": 7,
+    "rubric_total": 7
+  },
+  {
+    "task_id": "T063_005",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 5,
+    "reward": 0.875,
+    "rubric_met": 7,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_006",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 2,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_008",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 2,
+    "reward": 0.625,
+    "rubric_met": 5,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_009",
+    "ok": true,
+    "termination": "agent_error",
+    "steps": 6,
+    "reward": 0.0,
+    "rubric_met": null,
+    "rubric_total": null
+  },
+  {
+    "task_id": "T063_010",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 3,
+    "reward": 0.625,
+    "rubric_met": 5,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_011",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 9,
+    "reward": 0.5,
+    "rubric_met": 4,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_013",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 4,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_014",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 4,
+    "reward": 1.0,
+    "rubric_met": 8,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_015",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 2,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_016",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 3,
+    "reward": 0.625,
+    "rubric_met": 5,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_017",
+    "ok": true,
+    "termination": "agent_error",
+    "steps": 5,
+    "reward": 0.0,
+    "rubric_met": null,
+    "rubric_total": null
+  },
+  {
+    "task_id": "T063_018",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 5,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_019",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 7,
+    "reward": 0.625,
+    "rubric_met": 5,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_020",
+    "ok": true,
+    "termination": "agent_error",
+    "steps": 1,
+    "reward": 0.0,
+    "rubric_met": null,
+    "rubric_total": null
+  },
+  {
+    "task_id": "T063_021",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 3,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_022",
+    "ok": true,
+    "termination": "agent_error",
+    "steps": 3,
+    "reward": 0.0,
+    "rubric_met": null,
+    "rubric_total": null
+  },
+  {
+    "task_id": "T063_024",
+    "ok": true,
+    "termination": "agent_error",
+    "steps": 5,
+    "reward": 0.0,
+    "rubric_met": null,
+    "rubric_total": null
+  },
+  {
+    "task_id": "T063_029",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 6,
+    "reward": 0.875,
+    "rubric_met": 7,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_030",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 8,
+    "reward": 0.875,
+    "rubric_met": 7,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_031",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 3,
+    "reward": 0.625,
+    "rubric_met": 5,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_032",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 8,
+    "reward": 1.0,
+    "rubric_met": 8,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_034",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 2,
+    "reward": 0.5,
+    "rubric_met": 4,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_035",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 7,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_036",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 5,
+    "reward": 0.875,
+    "rubric_met": 7,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_037",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 4,
+    "reward": 0.5,
+    "rubric_met": 4,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_038",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 3,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_039",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 5,
+    "reward": 0.7142857142857143,
+    "rubric_met": 5,
+    "rubric_total": 7
+  },
+  {
+    "task_id": "T063_040",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 5,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_041",
+    "ok": true,
+    "termination": "agent_error",
+    "steps": 3,
+    "reward": 0.0,
+    "rubric_met": null,
+    "rubric_total": null
+  },
+  {
+    "task_id": "T063_042",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 3,
+    "reward": 0.6666666666666666,
+    "rubric_met": 6,
+    "rubric_total": 9
+  },
+  {
+    "task_id": "T063_043",
+    "ok": true,
+    "termination": "agent_error",
+    "steps": 1,
+    "reward": 0.0,
+    "rubric_met": null,
+    "rubric_total": null
+  },
+  {
+    "task_id": "T063_045",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 3,
+    "reward": 0.6666666666666666,
+    "rubric_met": 6,
+    "rubric_total": 9
+  },
+  {
+    "task_id": "T063_046",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 3,
+    "reward": 0.5555555555555556,
+    "rubric_met": 5,
+    "rubric_total": 9
+  },
+  {
+    "task_id": "T063_047",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 8,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_048",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 3,
+    "reward": 0.7777777777777778,
+    "rubric_met": 7,
+    "rubric_total": 9
+  },
+  {
+    "task_id": "T063_049",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 5,
+    "reward": 0.625,
+    "rubric_met": 5,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_050",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 5,
+    "reward": 0.6666666666666666,
+    "rubric_met": 6,
+    "rubric_total": 9
+  },
+  {
+    "task_id": "T063_012",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 4,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_023",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 4,
+    "reward": 0.625,
+    "rubric_met": 5,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_025",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 3,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_026",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 4,
+    "reward": 0.7777777777777778,
+    "rubric_met": 7,
+    "rubric_total": 9
+  },
+  {
+    "task_id": "T063_027",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 7,
+    "reward": 0.375,
+    "rubric_met": 3,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_028",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 6,
+    "reward": 0.625,
+    "rubric_met": 5,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_044",
+    "ok": true,
+    "termination": "agent_error",
+    "steps": 5,
+    "reward": 0.0,
+    "rubric_met": null,
+    "rubric_total": null
+  },
+  {
+    "task_id": "T063_033",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 4,
+    "reward": 0.625,
+    "rubric_met": 5,
+    "rubric_total": 8,
+    "promoted_from": "/tmp/T063_033_debug.json",
+    "promoted_at": "2026-06-04T09:26:39.991667+00:00"
+  }
+]

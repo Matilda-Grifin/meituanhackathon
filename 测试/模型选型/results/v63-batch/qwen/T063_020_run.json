@@ -1,0 +1,32 @@
+{
+  "run_at": "2026-06-04T04:21:05.161708+00:00",
+  "task_id": "T063_020",
+  "pipeline": "vitabench_eval_v63",
+  "session_id": "v63-T063_020-03488771",
+  "termination": "agent_error",
+  "steps": 1,
+  "num_errors": 1,
+  "max_steps": 100,
+  "max_errors": 10,
+  "trajectory": [
+    {
+      "role": "user",
+      "content": "今天想在上海跨区玩一天，别安排太赶。",
+      "turn": 1
+    },
+    {
+      "role": "assistant",
+      "content": "[agent_error] timeout",
+      "turn": 1,
+      "error": "timeout"
+    }
+  ],
+  "reward_info": {
+    "reward": 0.0,
+    "reason": "agent_error"
+  },
+  "first_response": {
+    "score": 75,
+    "reason": "progress_no_timing"
+  }
+}

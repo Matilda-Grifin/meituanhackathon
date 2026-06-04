@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Qwen3.6-Plus · 6.3 本地生活测评报告</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f6f8fb; --card: #fff; --text: #1a2332; --muted: #5c6b7a;
+      --accent: #1677ff; --border: #e8ecf1; --warn: #fff7e6; --warn-b: #ffd591;
+    }
+    body { margin: 0; font-family: "PingFang SC","Microsoft YaHei",sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.8; font-size: 15px; }
+    .wrap { max-width: 1140px; margin: 0 auto; padding: 32px 20px 64px; }
+    h1 { font-size: 1.75rem; margin: 0 0 8px; font-weight: 600; }
+    .subtitle { color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+    section { background: var(--card); border-radius: 12px; padding: 24px 28px;
+      margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.06); border: 1px solid var(--border); }
+    h2 { font-size: 1.15rem; margin: 0 0 14px; color: var(--accent); font-weight: 600; }
+    h3 { font-size: 1rem; margin: 18px 0 10px; color: var(--text); }
+    p { margin: 0 0 14px; }
+  p:last-child { margin-bottom: 0; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 18px 0; }
+    .kpi { background: #f0f5ff; border-radius: 10px; padding: 14px; text-align: center; }
+    .kpi strong { display: block; font-size: 1.45rem; color: var(--accent); }
+    .kpi span { font-size: 0.82rem; color: var(--muted); line-height: 1.4; }
+    .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 16px; }
+    .chart-box { position: relative; height: 260px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 10px; }
+    th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #f0f5ff; font-weight: 600; }
+    tr:nth-child(even) { background: #fafbfc; }
+    .callout { background: var(--warn); border: 1px solid var(--warn-b); border-radius: 8px; padding: 14px 16px; margin: 14px 0; }
+    .flow { background: #fafbfc; border-radius: 8px; padding: 16px 20px; margin: 12px 0;
+      font-size: 0.92rem; line-height: 2; }
+    ol.metrics { margin: 8px 0 0 1.2em; padding: 0; }
+    ol.metrics li { margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Qwen3.6-Plus · 6.3 本地生活 Agent 测评报告</h1>
+  <p class="subtitle">模型：通义 Qwen3.6-Plus（思考深度 medium，温度 0）｜任务集：50 条本地出行+餐饮场景｜方案版本：6.3｜报告生成：2026-06-04 17:39</p>
+
+  <section>
+    <h2>一、测评在做什么（6.3 流程）</h2>
+    <p>本次测评的目标是：在统一的仿真环境与任务集上，比较哪一个大模型更适合作为「本地生活出行规划 Agent」的大脑。整体思路沿用 VitaBench 式「环境 + 用户 + 助手 + 裁判」四段式，而不是让脚本代替用户发固定话术。</p>
+    <p>每条任务预先写好四块内容：仿真环境（住址、历史订单、城市与时间）、用户画像、隐藏任务指令（仅用户模拟器可见）、以及检查清单（仅裁判可见）。正式开跑后，由调度器循环推进：用户模拟器根据画像和指令生成首轮及后续用户发言；助手通过 OpenClaw 网关调用天气、高德 POI、路线等工具并回复；若用户判定需求已满足则结束，否则继续对话。对话结束后，裁判模型按「滑动窗口」阅读整段轨迹（默认每窗 10 轮、重叠 2 轮），逐条更新检查项是否满足，并汇总为得分率。</p>
+    <div class="flow">用户模拟器（DeepSeek）→ 助手（Qwen 网关 + MCP 工具）→ 用户 … → 结束 → 滑动窗口裁判（GPT-5.5）→ 得分率 + 首响分</div>
+    <p>与旧版 6.2 脚本打分不同：6.3 的主分由裁判根据任务附带的检查清单判定，更贴近「方案是否真正满足约束」；用户模拟器与裁判走 OpenRouter 海外线路，助手走 ECS 上的 Qwen 网关，三路相互独立。</p>
+  </section>
+
+  <section>
+    <h2>二、测评指标怎么读（6.3 北极星）</h2>
+    <p>答辩与选型时建议同时看「做对多少」和「首响快不快」，二者分开计算、不互相替代。</p>
+    <ol class="metrics">
+      <li><strong>检查项得分率（主指标）</strong>：满足的检查条数 ÷ 该题总条数。例如 8 条里满足 6 条则为 75%。全部满足为 100%，是「满分题」。</li>
+      <li><strong>满分率（Full Success）</strong>：50 题里得分率为 100% 的题数占比，表示「整题做对」的比例。另有辅线：得分率 ≥ 80% 的题数（部分成功），用于看「大体可用」有多少。</li>
+      <li><strong>首响时效分（first_response，北极星之二）</strong>：只看助手<strong>第一轮</strong>响应速度体验。若采集到首字耗时：≤10 秒 100 分，≤15 秒 70 分，≤25 秒 40 分，更慢 10 分；若未采集耗时但首轮有可见文字或工具进度，记 75 分；首轮无进展记 40 分。达标线常用 70 分（对应 15 秒内或有等价进展）。</li>
+      <li><strong>对话轮次、结束方式</strong>：轮次反映交互深度；结束方式为「用户满意结束」最理想。助手异常、超步数、工具错误过多时，检查项得分率直接记 0，且通常不做裁判打分。</li>
+    </ol>
+    <p>本次跑数中，网关未回传首字耗时字段，故 50 题首响分均为 75 分（「首轮有回复，未采集首字耗时」）。若后续网关补齐计时，首响分布会更有区分度。</p>
+  </section>
+
+  <section>
+    <h2>三、Qwen 跑数结果概览</h2>
+    <p>50 条任务均已落盘，具备对话轨迹与结束原因。其中 41 条走完「用户满意结束 + 裁判打分」，9 条在助手侧异常退出，检查项得分率记 0 且未调用裁判。另有一批曾在批量过程中因 OpenRouter 欠费或代理抖动失败，已重跑或并入成功试跑结果（如第 33 题），不计入下列 9 条助手异常。</p>
+    <div class="kpis">
+      <div class="kpi"><strong>50/50</strong><span>题目均有记录</span></div>
+      <div class="kpi"><strong>41</strong><span>完成裁判打分</span></div>
+      <div class="kpi"><strong>71.5%</strong><span>已评分题平均得分率</span></div>
+      <div class="kpi"><strong>58.7%</strong><span>全 50 题平均（含 0 分）</span></div>
+      <div class="kpi"><strong>3</strong><span>满分题数（100%）</span></div>
+      <div class="kpi"><strong>8</strong><span>得分率 ≥80%</span></div>
+      <div class="kpi"><strong>75</strong><span>首响均分（0–100）</span></div>
+      <div class="kpi"><strong>50/50</strong><span>首响 ≥70 分</span></div>
+      <div class="kpi"><strong>41</strong><span>用户满意结束</span></div>
+      <div class="kpi"><strong>9</strong><span>助手异常未评分</span></div>
+    </div>
+    <div class="charts">
+      <div class="chart-box"><canvas id="chartTerm"></canvas></div>
+      <div class="chart-box"><canvas id="chartReward"></canvas></div>
+      <div class="chart-box"><canvas id="chartDiff"></canvas></div>
+      <div class="chart-box"><canvas id="chartFr"></canvas></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>四、失败原因说明（勿与「网络重跑」混淆）</h2>
+    <p>曾有多题因<strong>海外裁判/用户模拟</strong>线路（OpenRouter 欠费、IPRoyal 代理）在对话结束后打分失败，与助手网关无关；该批已通过重跑或并入试跑结果修复，例如 12、23、25、26、27、28 等已正常得分，33 已并入正式集。</p>
+    <p>下列 9 题属于<strong>助手 / OpenClaw 桥接</strong>问题，重跑 OpenRouter 无法解决；表现为对话中途助手异常退出，检查项得分率为 0。</p>
+    <div class="callout">
+      <p><strong>3 题 — 助手单轮等待超时</strong>（020、041、043）：在约 7 分钟时限内网关未返回，记为超时，多发生在首轮或前几轮。</p>
+      <p><strong>6 题 — 桥接传入空消息</strong>（样例 001、009、017、022、024、044）：OpenClaw 命令行报错「消息不能为空」，多为评测程序向网关提交的用户内容为空，属于对接问题，不是海外代理故障。其中 044 曾先遇裁判网络失败，重跑后变为该类桥接错误。</p>
+    </div>
+    <table>
+      <thead><tr><th>题号</th><th>场景</th><th>轮次</th><th>归类</th><th>原始报错摘要</th></tr></thead>
+      <tbody><tr><td>T063_009</td><td>成都小吃半日</td><td>6</td><td>桥接空消息</td><td>Error: Message (--message) is required</td></tr><tr><td>T063_017</td><td>杭州书店展览半日</td><td>5</td><td>桥接空消息</td><td>Error: Message (--message) is required</td></tr><tr><td>T063_020</td><td>上海城市一日</td><td>1</td><td>轮次超时</td><td>timeout</td></tr><tr><td>T063_022</td><td>成都Livehouse一日</td><td>3</td><td>桥接空消息</td><td>Error: Message (--message) is required</td></tr><tr><td>T063_024</td><td>洛阳公园半日</td><td>5</td><td>桥接空消息</td><td>Error: Message (--message) is required</td></tr><tr><td>T063_041</td><td>上海赶高铁半日</td><td>3</td><td>轮次超时</td><td>timeout</td></tr><tr><td>T063_043</td><td>北京暴雨改方案</td><td>1</td><td>轮次超时</td><td>timeout</td></tr><tr><td>T063_044</td><td>青岛大风改室内</td><td>5</td><td>桥接空消息</td><td>Error: Message (--message) is required</td></tr><tr><td>T063_SAMPLE_001</td><td>闺蜜2人 · 周边半日 · 逛展+午饭 · 少油</td><td>44</td><td>桥接空消息</td><td>Error: Message (--message) is required</td></tr></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>五、分任务明细</h2>
+    <p>下表按检查项得分率从高到低排列。列含义：结束方式；对话轮次；检查项得分率及通过条数；首响分及说明；首字耗时（若网关提供）。</p>
+    <table>
+      <thead>
+        <tr>
+          <th>城市</th><th>场景</th><th>难度</th><th>结束方式</th><th>轮次</th>
+          <th>得分率</th><th>检查项</th><th>首响分</th><th>首响说明</th><th>首字耗时</th>
+        </tr>
+      </thead>
+      <tbody><tr><td>南京</td><td>南京美术馆散步半日</td><td>easy</td><td>用户满意结束</td><td>6</td><td>100%</td><td>7/7</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>合肥</td><td>合肥科技馆一日</td><td>easy</td><td>用户满意结束</td><td>4</td><td>100%</td><td>8/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>天津</td><td>天津海河一日</td><td>medium</td><td>用户满意结束</td><td>8</td><td>100%</td><td>8/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>天津</td><td>天津早点相声半日</td><td>easy</td><td>用户满意结束</td><td>4</td><td>88%</td><td>7/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>广州</td><td>广州亲子商场半日</td><td>easy</td><td>用户满意结束</td><td>5</td><td>88%</td><td>7/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>昆明</td><td>昆明民族村半日</td><td>medium</td><td>用户满意结束</td><td>6</td><td>88%</td><td>7/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>长沙</td><td>长沙城市一日亲子</td><td>medium</td><td>用户满意结束</td><td>8</td><td>88%</td><td>7/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>重庆</td><td>重庆火锅半日</td><td>medium</td><td>用户满意结束</td><td>5</td><td>88%</td><td>7/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>青岛</td><td>青岛鲁菜半日</td><td>medium</td><td>用户满意结束</td><td>4</td><td>78%</td><td>7/9</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>洛阳</td><td>洛阳无障碍半日</td><td>hard</td><td>用户满意结束</td><td>3</td><td>78%</td><td>7/9</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>洛阳</td><td>洛阳博物馆半日</td><td>easy</td><td>用户满意结束</td><td>2</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>苏州</td><td>苏州园林半日</td><td>easy</td><td>用户满意结束</td><td>3</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>哈尔滨</td><td>哈尔滨中央大街半日</td><td>easy</td><td>用户满意结束</td><td>4</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>长沙</td><td>长沙商场亲子半日</td><td>easy</td><td>用户满意结束</td><td>4</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>重庆</td><td>重庆夜景半日</td><td>easy</td><td>用户满意结束</td><td>2</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>北京</td><td>北京城市一日亲子</td><td>medium</td><td>用户满意结束</td><td>5</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>深圳</td><td>深圳精酿半日</td><td>medium</td><td>用户满意结束</td><td>3</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>南京</td><td>南京城市一日</td><td>medium</td><td>用户满意结束</td><td>3</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>北京</td><td>北京奥森半日</td><td>medium</td><td>用户满意结束</td><td>7</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>上海</td><td>上海咖啡轻食半日</td><td>medium</td><td>用户满意结束</td><td>3</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>武汉</td><td>武汉东湖半日</td><td>medium</td><td>用户满意结束</td><td>5</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>昆明</td><td>昆明高原一日</td><td>hard</td><td>用户满意结束</td><td>8</td><td>75%</td><td>6/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>南京</td><td>南京博物院一日</td><td>medium</td><td>用户满意结束</td><td>5</td><td>71%</td><td>5/7</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>杭州</td><td>杭州雨天改室内</td><td>hard</td><td>用户满意结束</td><td>3</td><td>67%</td><td>6/9</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>成都</td><td>成都多约束一日</td><td>hard</td><td>用户满意结束</td><td>3</td><td>67%</td><td>6/9</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>长沙</td><td>长沙改主意重规划</td><td>hard</td><td>用户满意结束</td><td>5</td><td>67%</td><td>6/9</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>北京</td><td>北京亲子半日_科技馆午饭</td><td>easy</td><td>用户满意结束</td><td>2</td><td>62%</td><td>5/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>武汉</td><td>武汉江景一日</td><td>easy</td><td>用户满意结束</td><td>2</td><td>62%</td><td>5/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>青岛</td><td>青岛海滨步道半日</td><td>easy</td><td>用户满意结束</td><td>3</td><td>62%</td><td>5/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>深圳</td><td>深圳午休轻食半日</td><td>easy</td><td>用户满意结束</td><td>3</td><td>62%</td><td>5/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>武汉</td><td>武汉小龙虾半日</td><td>medium</td><td>用户满意结束</td><td>7</td><td>62%</td><td>5/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>广州</td><td>广州早茶半日</td><td>medium</td><td>用户满意结束</td><td>4</td><td>62%</td><td>5/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>厦门</td><td>厦门鼓浪屿半日</td><td>medium</td><td>用户满意结束</td><td>6</td><td>62%</td><td>5/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>合肥</td><td>合肥湿地半日</td><td>medium</td><td>用户满意结束</td><td>3</td><td>62%</td><td>5/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>哈尔滨</td><td>哈尔滨冰雪半日</td><td>medium</td><td>用户满意结束</td><td>4</td><td>62%</td><td>5/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>深圳</td><td>深圳跨区预约一日</td><td>hard</td><td>用户满意结束</td><td>5</td><td>62%</td><td>5/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>广州</td><td>广州暴雨亲子</td><td>hard</td><td>用户满意结束</td><td>3</td><td>56%</td><td>5/9</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>厦门</td><td>厦门文创市集一日</td><td>easy</td><td>用户满意结束</td><td>9</td><td>50%</td><td>4/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>杭州</td><td>杭州西湖一日</td><td>medium</td><td>用户满意结束</td><td>2</td><td>50%</td><td>4/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>深圳</td><td>深圳城市一日</td><td>medium</td><td>用户满意结束</td><td>4</td><td>50%</td><td>4/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>苏州</td><td>苏州平江路一日</td><td>medium</td><td>用户满意结束</td><td>7</td><td>38%</td><td>3/8</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>成都</td><td>成都小吃半日</td><td>easy</td><td>助手异常（未评分）</td><td>6</td><td>0%（助手异常）</td><td>未评分</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>杭州</td><td>杭州书店展览半日</td><td>medium</td><td>助手异常（未评分）</td><td>5</td><td>0%（助手异常）</td><td>未评分</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>上海</td><td>上海城市一日</td><td>medium</td><td>助手异常（未评分）</td><td>1</td><td>0%（助手异常）</td><td>未评分</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>成都</td><td>成都Livehouse一日</td><td>medium</td><td>助手异常（未评分）</td><td>3</td><td>0%（助手异常）</td><td>未评分</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>洛阳</td><td>洛阳公园半日</td><td>medium</td><td>助手异常（未评分）</td><td>5</td><td>0%（助手异常）</td><td>未评分</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>上海</td><td>上海赶高铁半日</td><td>hard</td><td>助手异常（未评分）</td><td>3</td><td>0%（助手异常）</td><td>未评分</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>北京</td><td>北京暴雨改方案</td><td>hard</td><td>助手异常（未评分）</td><td>1</td><td>0%（助手异常）</td><td>未评分</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>青岛</td><td>青岛大风改室内</td><td>hard</td><td>助手异常（未评分）</td><td>5</td><td>0%（助手异常）</td><td>未评分</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr><tr><td>上海</td><td>闺蜜2人 · 周边半日 · 逛展+午饭 · 少油</td><td>medium</td><td>助手异常（未评分）</td><td>44</td><td>0%（助手异常）</td><td>未评分</td><td>75 分</td><td>首轮有回复，未采集首字耗时</td><td>未采集</td></tr></tbody>
+    </table>
+    <p style="margin-top:14px;font-size:0.88rem;color:var(--muted)">数据目录：测试/模型选型/results/v63-batch/qwen/ · 方案说明：待修复/模型选型评测/6.3方案/</p>
+  </section>
+</div>
+<script>
+const font = { family: "'PingFang SC','Microsoft YaHei',sans-serif" };
+new Chart(document.getElementById('chartTerm'), {
+  type: 'doughnut',
+  data: { labels: ["助手异常（未评分）", "用户满意结束"], datasets: [{ data: [9, 41], backgroundColor: ['#1677ff','#69b1ff','#ff7875'] }] },
+  options: { plugins: { title: { display: true, text: '对话结束方式', font }, legend: { position: 'bottom' } }, responsive: true, maintainAspectRatio: false }
+});
+new Chart(document.getElementById('chartReward'), {
+  type: 'bar',
+  data: { labels: ["满分 100%", "75%–99%", "50%–74%", "25%–49%", "0%（含未评分）"], datasets: [{ label: '题数', data: [3, 19, 18, 1, 9], backgroundColor: '#1677ff' }] },
+  options: { plugins: { title: { display: true, text: '检查项得分率分布（50 题）', font } }, scales: { y: { beginAtZero: true } }, responsive: true, maintainAspectRatio: false }
+});
+new Chart(document.getElementById('chartDiff'), {
+  type: 'bar',
+  data: { labels: ["easy", "medium", "hard"], datasets: [{ label: '平均得分率 %', data: [75.0, 70.6, 67.3], backgroundColor: '#52c41a' }] },
+  options: { plugins: { title: { display: true, text: '分难度平均得分率（已评分）', font } }, scales: { y: { max: 100, beginAtZero: true } }, responsive: true, maintainAspectRatio: false }
+});
+new Chart(document.getElementById('chartFr'), {
+  type: 'bar',
+  data: { labels: ["75"], datasets: [{ label: '题数', data: [50], backgroundColor: '#722ed1' }] },
+  options: { plugins: { title: { display: true, text: '首响时效分分布', font } }, scales: { y: { beginAtZero: true } }, responsive: true, maintainAspectRatio: false }
+});
+</script>
+</body>
+</html>

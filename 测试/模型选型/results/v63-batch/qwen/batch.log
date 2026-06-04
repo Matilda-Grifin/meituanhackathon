@@ -1,0 +1,223 @@
+batch start: 49 tasks, exclude={'T063_007'}, out=/root/meituan-lifecare-agent/benchmark/model_selection/results/v63-batch/qwen
+[1/49] running T063_SAMPLE_001...
+  -> {'task_id': 'T063_SAMPLE_001', 'ok': True, 'termination': 'agent_error', 'steps': 44, 'reward': 0.0, 'rubric_met': None, 'rubric_total': None}
+[2/49] running T063_002...
+  -> {'task_id': 'T063_002', 'ok': True, 'termination': 'user_stop', 'steps': 2, 'reward': 0.625, 'rubric_met': 5, 'rubric_total': 8}
+[3/49] running T063_003...
+  -> {'task_id': 'T063_003', 'ok': True, 'termination': 'user_stop', 'steps': 4, 'reward': 0.875, 'rubric_met': 7, 'rubric_total': 8}
+[4/49] running T063_004...
+  -> {'task_id': 'T063_004', 'ok': True, 'termination': 'user_stop', 'steps': 6, 'reward': 1.0, 'rubric_met': 7, 'rubric_total': 7}
+[5/49] running T063_005...
+  -> {'task_id': 'T063_005', 'ok': True, 'termination': 'user_stop', 'steps': 5, 'reward': 0.875, 'rubric_met': 7, 'rubric_total': 8}
+[6/49] running T063_006...
+  -> {'task_id': 'T063_006', 'ok': True, 'termination': 'user_stop', 'steps': 2, 'reward': 0.75, 'rubric_met': 6, 'rubric_total': 8}
+[7/49] running T063_008...
+  -> {'task_id': 'T063_008', 'ok': True, 'termination': 'user_stop', 'steps': 2, 'reward': 0.625, 'rubric_met': 5, 'rubric_total': 8}
+[8/49] running T063_009...
+  -> {'task_id': 'T063_009', 'ok': True, 'termination': 'agent_error', 'steps': 6, 'reward': 0.0, 'rubric_met': None, 'rubric_total': None}
+[9/49] running T063_010...
+  -> {'task_id': 'T063_010', 'ok': True, 'termination': 'user_stop', 'steps': 3, 'reward': 0.625, 'rubric_met': 5, 'rubric_total': 8}
+[10/49] running T063_011...
+  -> {'task_id': 'T063_011', 'ok': True, 'termination': 'user_stop', 'steps': 9, 'reward': 0.5, 'rubric_met': 4, 'rubric_total': 8}
+[11/49] running T063_012...
+  -> {'task_id': 'T063_012', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/run_benchmark.py", line 102, in <module>\n    main()\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/run_benchmark.py", line 63, in main\n    result = run_simulation(\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/orchestrator.py", line 135, in run_simulation\n    reward_info = evaluate_trajectory(task, trajectory, model=judge_model, temperature=jtemp)\n  File "/root/meituan-'}
+[12/49] running T063_013...
+  -> {'task_id': 'T063_013', 'ok': True, 'termination': 'user_stop', 'steps': 4, 'reward': 0.75, 'rubric_met': 6, 'rubric_total': 8}
+[13/49] running T063_014...
+  -> {'task_id': 'T063_014', 'ok': True, 'termination': 'user_stop', 'steps': 4, 'reward': 1.0, 'rubric_met': 8, 'rubric_total': 8}
+[14/49] running T063_015...
+  -> {'task_id': 'T063_015', 'ok': True, 'termination': 'user_stop', 'steps': 2, 'reward': 0.75, 'rubric_met': 6, 'rubric_total': 8}
+[15/49] running T063_016...
+  -> {'task_id': 'T063_016', 'ok': True, 'termination': 'user_stop', 'steps': 3, 'reward': 0.625, 'rubric_met': 5, 'rubric_total': 8}
+[16/49] running T063_017...
+  -> {'task_id': 'T063_017', 'ok': True, 'termination': 'agent_error', 'steps': 5, 'reward': 0.0, 'rubric_met': None, 'rubric_total': None}
+[17/49] running T063_018...
+  -> {'task_id': 'T063_018', 'ok': True, 'termination': 'user_stop', 'steps': 5, 'reward': 0.75, 'rubric_met': 6, 'rubric_total': 8}
+[18/49] running T063_019...
+  -> {'task_id': 'T063_019', 'ok': True, 'termination': 'user_stop', 'steps': 7, 'reward': 0.625, 'rubric_met': 5, 'rubric_total': 8}
+[19/49] running T063_020...
+  -> {'task_id': 'T063_020', 'ok': True, 'termination': 'agent_error', 'steps': 1, 'reward': 0.0, 'rubric_met': None, 'rubric_total': None}
+[20/49] running T063_021...
+  -> {'task_id': 'T063_021', 'ok': True, 'termination': 'user_stop', 'steps': 3, 'reward': 0.75, 'rubric_met': 6, 'rubric_total': 8}
+[21/49] running T063_022...
+  -> {'task_id': 'T063_022', 'ok': True, 'termination': 'agent_error', 'steps': 3, 'reward': 0.0, 'rubric_met': None, 'rubric_total': None}
+[22/49] running T063_023...
+  -> {'task_id': 'T063_023', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 144, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[23/49] running T063_024...
+  -> {'task_id': 'T063_024', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 144, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[24/49] running T063_025...
+  -> {'task_id': 'T063_025', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 144, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[25/49] running T063_026...
+  -> {'task_id': 'T063_026', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 144, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[26/49] running T063_027...
+batch start: 49 tasks, exclude={'T063_007'}, out=/root/meituan-lifecare-agent/benchmark/model_selection/results/v63-batch/qwen
+already have run.json: 20, to_run: 29
+[1/49] skip (run.json exists) T063_SAMPLE_001
+[2/49] skip (run.json exists) T063_002
+[3/49] skip (run.json exists) T063_003
+[4/49] skip (run.json exists) T063_004
+[5/49] skip (run.json exists) T063_005
+[6/49] skip (run.json exists) T063_006
+[7/49] skip (run.json exists) T063_008
+[8/49] skip (run.json exists) T063_009
+[9/49] skip (run.json exists) T063_010
+[10/49] skip (run.json exists) T063_011
+[11/49] running T063_012...
+  -> {'task_id': 'T063_012', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 147, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[12/49] skip (run.json exists) T063_013
+[13/49] skip (run.json exists) T063_014
+[14/49] skip (run.json exists) T063_015
+[15/49] skip (run.json exists) T063_016
+[16/49] skip (run.json exists) T063_017
+[17/49] skip (run.json exists) T063_018
+[18/49] skip (run.json exists) T063_019
+[19/49] skip (run.json exists) T063_020
+[20/49] skip (run.json exists) T063_021
+[21/49] skip (run.json exists) T063_022
+[22/49] running T063_023...
+  -> {'task_id': 'T063_023', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 147, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[23/49] running T063_024...
+  -> {'task_id': 'T063_024', 'ok': True, 'termination': 'agent_error', 'steps': 5, 'reward': 0.0, 'rubric_met': None, 'rubric_total': None}
+[24/49] running T063_025...
+retry_failed: ['T063_012', 'T063_023', 'T063_025', 'T063_026']
+batch start: 49 tasks, exclude={'T063_007'}, out=/root/meituan-lifecare-agent/benchmark/model_selection/results/v63-batch/qwen
+already have run.json: 21, retry: 4, to_run: 28
+[1/49] skip (run.json exists) T063_SAMPLE_001
+[2/49] skip (run.json exists) T063_002
+[3/49] skip (run.json exists) T063_003
+[4/49] skip (run.json exists) T063_004
+[5/49] skip (run.json exists) T063_005
+[6/49] skip (run.json exists) T063_006
+[7/49] skip (run.json exists) T063_008
+[8/49] skip (run.json exists) T063_009
+[9/49] skip (run.json exists) T063_010
+[10/49] skip (run.json exists) T063_011
+[11/49] running T063_012 (retry)...
+  -> {'task_id': 'T063_012', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 147, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[12/49] skip (run.json exists) T063_013
+[13/49] skip (run.json exists) T063_014
+[14/49] skip (run.json exists) T063_015
+[15/49] skip (run.json exists) T063_016
+[16/49] skip (run.json exists) T063_017
+[17/49] skip (run.json exists) T063_018
+[18/49] skip (run.json exists) T063_019
+[19/49] skip (run.json exists) T063_020
+[20/49] skip (run.json exists) T063_021
+[21/49] skip (run.json exists) T063_022
+[22/49] running T063_023 (retry)...
+  -> {'task_id': 'T063_023', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 147, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[23/49] skip (run.json exists) T063_024
+[24/49] running T063_025 (retry)...
+  -> {'task_id': 'T063_025', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 147, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[25/49] running T063_026 (retry)...
+  -> {'task_id': 'T063_026', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 147, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[26/49] running T063_027...
+  -> {'task_id': 'T063_027', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 147, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[27/49] running T063_028...
+  -> {'task_id': 'T063_028', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/llm_client.py", line 147, in chat_completion\n    with opener.open(req, timeout=timeout_s) as resp:\n  File "/usr/lib/python3.10/urllib/request.py", line 525, in open\n    response = meth(req, response)\n  File "/usr/lib/python3.10/urllib/request.py", line 634, in http_response\n    response = self.parent.error(\n  File "/usr/lib/python3.10/urllib/request.py", line 563, in error\n    return self._call_chain'}
+[28/49] running T063_029...
+  -> {'task_id': 'T063_029', 'ok': True, 'termination': 'user_stop', 'steps': 6, 'reward': 0.875, 'rubric_met': 7, 'rubric_total': 8}
+[29/49] running T063_030...
+  -> {'task_id': 'T063_030', 'ok': True, 'termination': 'user_stop', 'steps': 8, 'reward': 0.875, 'rubric_met': 7, 'rubric_total': 8}
+[30/49] running T063_031...
+  -> {'task_id': 'T063_031', 'ok': True, 'termination': 'user_stop', 'steps': 3, 'reward': 0.625, 'rubric_met': 5, 'rubric_total': 8}
+[31/49] running T063_032...
+  -> {'task_id': 'T063_032', 'ok': True, 'termination': 'user_stop', 'steps': 8, 'reward': 1.0, 'rubric_met': 8, 'rubric_total': 8}
+[32/49] running T063_033...
+  -> {'task_id': 'T063_033', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/run_benchmark.py", line 102, in <module>\n    main()\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/run_benchmark.py", line 63, in main\n    result = run_simulation(\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/orchestrator.py", line 135, in run_simulation\n    reward_info = evaluate_trajectory(task, trajectory, model=judge_model, temperature=jtemp)\n  File "/root/meituan-'}
+[33/49] running T063_034...
+  -> {'task_id': 'T063_034', 'ok': True, 'termination': 'user_stop', 'steps': 2, 'reward': 0.5, 'rubric_met': 4, 'rubric_total': 8}
+[34/49] running T063_035...
+  -> {'task_id': 'T063_035', 'ok': True, 'termination': 'user_stop', 'steps': 7, 'reward': 0.75, 'rubric_met': 6, 'rubric_total': 8}
+[35/49] running T063_036...
+  -> {'task_id': 'T063_036', 'ok': True, 'termination': 'user_stop', 'steps': 5, 'reward': 0.875, 'rubric_met': 7, 'rubric_total': 8}
+[36/49] running T063_037...
+  -> {'task_id': 'T063_037', 'ok': True, 'termination': 'user_stop', 'steps': 4, 'reward': 0.5, 'rubric_met': 4, 'rubric_total': 8}
+[37/49] running T063_038...
+  -> {'task_id': 'T063_038', 'ok': True, 'termination': 'user_stop', 'steps': 3, 'reward': 0.75, 'rubric_met': 6, 'rubric_total': 8}
+[38/49] running T063_039...
+  -> {'task_id': 'T063_039', 'ok': True, 'termination': 'user_stop', 'steps': 5, 'reward': 0.7142857142857143, 'rubric_met': 5, 'rubric_total': 7}
+[39/49] running T063_040...
+  -> {'task_id': 'T063_040', 'ok': True, 'termination': 'user_stop', 'steps': 5, 'reward': 0.75, 'rubric_met': 6, 'rubric_total': 8}
+[40/49] running T063_041...
+  -> {'task_id': 'T063_041', 'ok': True, 'termination': 'agent_error', 'steps': 3, 'reward': 0.0, 'rubric_met': None, 'rubric_total': None}
+[41/49] running T063_042...
+  -> {'task_id': 'T063_042', 'ok': True, 'termination': 'user_stop', 'steps': 3, 'reward': 0.6666666666666666, 'rubric_met': 6, 'rubric_total': 9}
+[42/49] running T063_043...
+  -> {'task_id': 'T063_043', 'ok': True, 'termination': 'agent_error', 'steps': 1, 'reward': 0.0, 'rubric_met': None, 'rubric_total': None}
+[43/49] running T063_044...
+  -> {'task_id': 'T063_044', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/run_benchmark.py", line 102, in <module>\n    main()\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/run_benchmark.py", line 63, in main\n    result = run_simulation(\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/orchestrator.py", line 135, in run_simulation\n    reward_info = evaluate_trajectory(task, trajectory, model=judge_model, temperature=jtemp)\n  File "/root/meituan-'}
+[44/49] running T063_045...
+  -> {'task_id': 'T063_045', 'ok': True, 'termination': 'user_stop', 'steps': 3, 'reward': 0.6666666666666666, 'rubric_met': 6, 'rubric_total': 9}
+[45/49] running T063_046...
+  -> {'task_id': 'T063_046', 'ok': True, 'termination': 'user_stop', 'steps': 3, 'reward': 0.5555555555555556, 'rubric_met': 5, 'rubric_total': 9}
+[46/49] running T063_047...
+  -> {'task_id': 'T063_047', 'ok': True, 'termination': 'user_stop', 'steps': 8, 'reward': 0.75, 'rubric_met': 6, 'rubric_total': 8}
+[47/49] running T063_048...
+  -> {'task_id': 'T063_048', 'ok': True, 'termination': 'user_stop', 'steps': 3, 'reward': 0.7777777777777778, 'rubric_met': 7, 'rubric_total': 9}
+[48/49] running T063_049...
+  -> {'task_id': 'T063_049', 'ok': True, 'termination': 'user_stop', 'steps': 5, 'reward': 0.625, 'rubric_met': 5, 'rubric_total': 8}
+[49/49] running T063_050...
+  -> {'task_id': 'T063_050', 'ok': True, 'termination': 'user_stop', 'steps': 5, 'reward': 0.6666666666666666, 'rubric_met': 6, 'rubric_total': 9}
+wrote /root/meituan-lifecare-agent/benchmark/model_selection/results/v63-batch/qwen/batch_summary.json
+retry_failed: ['T063_012', 'T063_023', 'T063_025', 'T063_026', 'T063_027', 'T063_028', 'T063_033', 'T063_044']
+batch start: 49 tasks, exclude={'T063_007'}, out=/root/meituan-lifecare-agent/benchmark/model_selection/results/v63-batch/qwen
+already have run.json: 41, retry: 8, to_run: 8
+[1/49] skip (run.json exists) T063_SAMPLE_001
+[2/49] skip (run.json exists) T063_002
+[3/49] skip (run.json exists) T063_003
+[4/49] skip (run.json exists) T063_004
+[5/49] skip (run.json exists) T063_005
+[6/49] skip (run.json exists) T063_006
+[7/49] skip (run.json exists) T063_008
+[8/49] skip (run.json exists) T063_009
+[9/49] skip (run.json exists) T063_010
+[10/49] skip (run.json exists) T063_011
+[11/49] running T063_012 (retry)...
+  -> {'task_id': 'T063_012', 'ok': True, 'termination': 'user_stop', 'steps': 4, 'reward': 0.75, 'rubric_met': 6, 'rubric_total': 8}
+[12/49] skip (run.json exists) T063_013
+[13/49] skip (run.json exists) T063_014
+[14/49] skip (run.json exists) T063_015
+[15/49] skip (run.json exists) T063_016
+[16/49] skip (run.json exists) T063_017
+[17/49] skip (run.json exists) T063_018
+[18/49] skip (run.json exists) T063_019
+[19/49] skip (run.json exists) T063_020
+[20/49] skip (run.json exists) T063_021
+[21/49] skip (run.json exists) T063_022
+[22/49] running T063_023 (retry)...
+  -> {'task_id': 'T063_023', 'ok': True, 'termination': 'user_stop', 'steps': 4, 'reward': 0.625, 'rubric_met': 5, 'rubric_total': 8}
+[23/49] skip (run.json exists) T063_024
+[24/49] running T063_025 (retry)...
+  -> {'task_id': 'T063_025', 'ok': True, 'termination': 'user_stop', 'steps': 3, 'reward': 0.75, 'rubric_met': 6, 'rubric_total': 8}
+[25/49] running T063_026 (retry)...
+  -> {'task_id': 'T063_026', 'ok': True, 'termination': 'user_stop', 'steps': 4, 'reward': 0.7777777777777778, 'rubric_met': 7, 'rubric_total': 9}
+[26/49] running T063_027 (retry)...
+  -> {'task_id': 'T063_027', 'ok': True, 'termination': 'user_stop', 'steps': 7, 'reward': 0.375, 'rubric_met': 3, 'rubric_total': 8}
+[27/49] running T063_028 (retry)...
+  -> {'task_id': 'T063_028', 'ok': True, 'termination': 'user_stop', 'steps': 6, 'reward': 0.625, 'rubric_met': 5, 'rubric_total': 8}
+[28/49] skip (run.json exists) T063_029
+[29/49] skip (run.json exists) T063_030
+[30/49] skip (run.json exists) T063_031
+[31/49] skip (run.json exists) T063_032
+[32/49] running T063_033 (retry)...
+  -> {'task_id': 'T063_033', 'ok': False, 'error': 'Traceback (most recent call last):\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/run_benchmark.py", line 102, in <module>\n    main()\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/run_benchmark.py", line 63, in main\n    result = run_simulation(\n  File "/root/meituan-lifecare-agent/benchmark/vitabench_eval/orchestrator.py", line 135, in run_simulation\n    reward_info = evaluate_trajectory(task, trajectory, model=judge_model, temperature=jtemp)\n  File "/root/meituan-'}
+[33/49] skip (run.json exists) T063_034
+[34/49] skip (run.json exists) T063_035
+[35/49] skip (run.json exists) T063_036
+[36/49] skip (run.json exists) T063_037
+[37/49] skip (run.json exists) T063_038
+[38/49] skip (run.json exists) T063_039
+[39/49] skip (run.json exists) T063_040
+[40/49] skip (run.json exists) T063_041
+[41/49] skip (run.json exists) T063_042
+[42/49] skip (run.json exists) T063_043
+[43/49] running T063_044 (retry)...
+  -> {'task_id': 'T063_044', 'ok': True, 'termination': 'agent_error', 'steps': 5, 'reward': 0.0, 'rubric_met': None, 'rubric_total': None}
+[44/49] skip (run.json exists) T063_045
+[45/49] skip (run.json exists) T063_046
+[46/49] skip (run.json exists) T063_047
+[47/49] skip (run.json exists) T063_048
+[48/49] skip (run.json exists) T063_049
+[49/49] skip (run.json exists) T063_050
+wrote /root/meituan-lifecare-agent/benchmark/model_selection/results/v63-batch/qwen/batch_summary.json
