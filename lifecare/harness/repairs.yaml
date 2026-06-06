@@ -1,0 +1,55 @@
+templates:
+  mock_data_notice: |
+    > **说明**：文中涉及的用户偏好/部分口碑描述来自演示种子或合成字段，POI 名称与坐标以高德为准，不代表真实点评库条数。
+
+  budget_estimate_notice: |
+    > **说明**：预算为根据公开票价与人均消费的估算区间，实际以到店/购票为准。
+
+  no_realtime_data_notice: |
+    > **提示**：当前实时地图/天气工具暂不可用，以下建议未基于最新查询结果，店名、路程与气温请勿当作实时数据。
+
+  search_degraded_notice: |
+    > **提示**：实时检索暂不可用，以下为基于常识的备选，请出发前用高德自行确认；文中不含实时 POI 链接。
+
+  weather_degraded_notice: |
+    > **提示**：未能获取实时天气，建议出行前查看天气预报 App；下文不写具体气温数值。
+
+  booking_reminder: |
+    > **预约**：热门场馆/餐厅建议提前在官方小程序预约。
+
+rules:
+  - match: output_forbidden.no_preset_party_size
+    action: strip_patterns
+    strip_patterns:
+      - "为您安排\\d+人[^。\\n]*"
+      - "\\d+人朋友局[^。\\n]*"
+
+  - match: output_required.mock_disclaimer
+    action: append_if_missing
+    template_id: mock_data_notice
+    marker: 演示种子或合成字段
+
+  - match: output_required.budget_estimate_notice
+    action: append_if_missing
+    template_id: budget_estimate_notice
+    marker: 估算区间
+
+  - match: output_required.tool_degraded_notice
+    action: prepend_if_missing
+    template_id: no_realtime_data_notice
+    marker: 实时地图/天气工具暂不可用
+
+  - match: output_required.search_degraded_notice
+    action: prepend_if_missing
+    template_id: search_degraded_notice
+    marker: 实时检索暂不可用
+
+  - match: output_required.weather_degraded_notice
+    action: prepend_if_missing
+    template_id: weather_degraded_notice
+    marker: 未能获取实时天气
+
+  - match: output_required.booking_reminder
+    action: append_if_missing
+    template_id: booking_reminder
+    marker: 官方小程序预约

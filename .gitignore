@@ -16,3 +16,5 @@ overseas-proxy/
 测试/模型选型/results/smoke-mt-20260603/
 测试/模型选型/results/v63-smoke/
 测试/模型选型/results/*.log
+测试/模型选型/results/**/*.log
+测试/模型选型/poll_*.py

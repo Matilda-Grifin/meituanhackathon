@@ -1,4 +1,5 @@
 import {
+  appendToolProgressStep,
   appendToolStepsFromPayload,
   historyDataUsedSearchPlaces,
 } from "../src/toolProgress";
@@ -24,6 +25,22 @@ for (const e of ["查询天气", "搜索 POI / 地点", "规划路线"]) {
     console.error("FAIL missing:", e, labels);
     process.exit(1);
   }
+}
+
+// 同一轮：结构化已记「查询天气」后，fallback 不应再刷
+const seenDup = new Set<string>();
+let dupSteps = appendToolStepsFromPayload(
+  [],
+  { data: { tool: "lifecare__lifecare_get_weather", arguments: { city: "杭州" } } },
+  seenDup,
+);
+for (let i = 0; i < 5; i++) {
+  dupSteps = appendToolProgressStep(dupSteps, "查询天气", seenDup);
+}
+const weatherLines = dupSteps.filter((s) => s.msg === "查询天气" || /^正在查询.+天气/.test(s.msg));
+if (weatherLines.length !== 1) {
+  console.error("FAIL weather dedup:", weatherLines.length, dupSteps.map((s) => s.msg));
+  process.exit(1);
 }
 
 const plan =

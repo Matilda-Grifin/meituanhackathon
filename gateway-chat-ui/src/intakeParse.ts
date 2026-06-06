@@ -7,6 +7,16 @@ export type IntakeBlock = { n: number; title: string; options: IntakeOption[] };
 const OPTION_LETTERS = "A-F";
 const FOLLOW_UP_TAG = /\{\{followUp:([^}]+)\}\}/;
 
+/** 问卷展示：去掉模型输出的 Markdown 加粗/星号 */
+export function cleanIntakeDisplayText(s: string): string {
+  return s
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*\*/g, "")
+    .replace(/^\*+\s*|\s*\*+$/g, "")
+    .replace(/^[-*•]\s+/, "")
+    .trim();
+}
+
 const INTAKE_CUT_PATTERNS: RegExp[] = [
   /\n#\s+[🗺️🏙️🌙🌧️]/,
   /\n##\s*📋/,
@@ -81,7 +91,7 @@ function parseOptionHint(raw: string): { hint: string; followUp?: IntakeFollowUp
   } else if (/飞机|航班|航站/i.test(hint)) {
     followUp = { placeholder: "到达/离开机场（选填）及时间", optional: true };
   }
-  return { hint: hint.slice(0, 160), followUp };
+  return { hint: cleanIntakeDisplayText(hint).slice(0, 160), followUp };
 }
 
 function stripOptionFromTitle(s: string): string {
@@ -117,11 +127,13 @@ function extractBoldOptionsFromLine(line: string, block: IntakeBlock) {
 }
 
 function stripMd(line: string): string {
-  return line
-    .trim()
-    .replace(/^\*\*+|\*\*+$/g, "")
-    .replace(/^#+\s*/, "")
-    .trim();
+  return cleanIntakeDisplayText(
+    line
+      .trim()
+      .replace(/^\*\*+|\*\*+$/g, "")
+      .replace(/^#+\s*/, "")
+      .trim(),
+  );
 }
 
 function isIntakeFooterLine(t: string): boolean {
@@ -194,10 +206,7 @@ export function mergeIntakeBlocks(prev: IntakeBlock[] | null, next: IntakeBlock[
 function extractIntro(text: string): string {
   const m = text.match(/^([\s\S]*?)(?=\n\s*\d+[\.、．]\s)/);
   if (!m?.[1]) return "";
-  return m[1]
-    .replace(/\*\*/g, "")
-    .replace(/^#+\s*/gm, "")
-    .trim();
+  return cleanIntakeDisplayText(m[1]!.replace(/^#+\s*/gm, ""));
 }
 
 /** 从 assistant 文本解析选择题 + 引导语 */

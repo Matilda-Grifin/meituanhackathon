@@ -35,6 +35,7 @@ if str(_ROOT) not in sys.path:
 from lifecare.clients import amap as amap_client
 from lifecare.clients import weather as weather_client
 from lifecare.config import get_settings
+from lifecare.harness.mcp_wrapper import run_with_harness
 from lifecare.mcp_tool_log import tool_span
 
 try:
@@ -125,24 +126,35 @@ def lifecare_search_places(
     attach_mock_reputation: 为 true 时每个 POI 附带 `reputation.for_weights`（高德分与确定性 mock 融合），
     便于全国任意 POI 做可复现的「好评率先验」测试；不含真实逐条评论文本。
     """
+    args = {
+        "keywords": keywords,
+        "city": city,
+        "limit": limit,
+        "extensions": extensions,
+        "attach_mock_reputation": attach_mock_reputation,
+    }
     holder: dict[str, Any] = {}
-    with tool_span(
-        "lifecare_search_places",
-        {"keywords": (keywords or "")[:80], "city": city or ""},
-        result_holder=holder,
-    ):
-        settings = get_settings()
-        c = city or settings.default_city
-        data = amap_client.search_poi_text(
-            keywords,
-            c,
-            limit=limit,
-            extensions=extensions,
-            attach_mock_reputation=attach_mock_reputation,
-        )
-        out = json.dumps(data, ensure_ascii=False)
-        holder["result"] = out
-        return out
+
+    def _execute() -> str:
+        with tool_span(
+            "lifecare_search_places",
+            {"keywords": (keywords or "")[:80], "city": city or ""},
+            result_holder=holder,
+        ):
+            settings = get_settings()
+            c = city or settings.default_city
+            data = amap_client.search_poi_text(
+                keywords,
+                c,
+                limit=limit,
+                extensions=extensions,
+                attach_mock_reputation=attach_mock_reputation,
+            )
+            out = json.dumps(data, ensure_ascii=False)
+            holder["result"] = out
+            return out
+
+    return run_with_harness("lifecare_search_places", args, _execute)
 
 
 @mcp.tool()
@@ -153,12 +165,22 @@ def lifecare_plan_route(
     dest_lat: float,
 ) -> str:
     """高德驾车路径规划：距离(米)、时间(秒)、出租车参考价（若有）。"""
+    args = {
+        "origin_lng": origin_lng,
+        "origin_lat": origin_lat,
+        "dest_lng": dest_lng,
+        "dest_lat": dest_lat,
+    }
     holder: dict[str, Any] = {}
-    with tool_span("lifecare_plan_route", {}, result_holder=holder):
-        data = amap_client.plan_route_driving(origin_lng, origin_lat, dest_lng, dest_lat)
-        out = json.dumps(data, ensure_ascii=False)
-        holder["result"] = out
-        return out
+
+    def _execute() -> str:
+        with tool_span("lifecare_plan_route", {}, result_holder=holder):
+            data = amap_client.plan_route_driving(origin_lng, origin_lat, dest_lng, dest_lat)
+            out = json.dumps(data, ensure_ascii=False)
+            holder["result"] = out
+            return out
+
+    return run_with_harness("lifecare_plan_route", args, _execute)
 
 
 @mcp.tool()
@@ -177,25 +199,35 @@ def lifecare_get_weather(
     """
     settings = get_settings()
     days = max(1, min(16, int(forecast_days)))
+    args = {
+        "city": city,
+        "latitude": latitude,
+        "longitude": longitude,
+        "forecast_days": days,
+    }
     holder: dict[str, Any] = {}
-    with tool_span(
-        "lifecare_get_weather",
-        {"city": city or "", "forecast_days": days},
-        result_holder=holder,
-    ):
-        if latitude is not None and longitude is not None:
-            label = (city or "").strip() or settings.default_city
-            data = weather_client.fetch_open_meteo(
-                float(latitude),
-                float(longitude),
-                forecast_days=days,
-                city_label=label,
-            )
-        else:
-            data = weather_client.fetch_weather_for_city(city, forecast_days=days)
-        out = json.dumps(data, ensure_ascii=False)
-        holder["result"] = out
-        return out
+
+    def _execute() -> str:
+        with tool_span(
+            "lifecare_get_weather",
+            {"city": city or "", "forecast_days": days},
+            result_holder=holder,
+        ):
+            if latitude is not None and longitude is not None:
+                label = (city or "").strip() or settings.default_city
+                data = weather_client.fetch_open_meteo(
+                    float(latitude),
+                    float(longitude),
+                    forecast_days=days,
+                    city_label=label,
+                )
+            else:
+                data = weather_client.fetch_weather_for_city(city, forecast_days=days)
+            out = json.dumps(data, ensure_ascii=False)
+            holder["result"] = out
+            return out
+
+    return run_with_harness("lifecare_get_weather", args, _execute)
 
 
 @mcp.tool()

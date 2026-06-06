@@ -1,0 +1,88 @@
+[
+  {
+    "task_id": "T063_002",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 4,
+    "reward": 0.625,
+    "rubric_met": 5,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_005",
+    "ok": true,
+    "termination": "agent_error",
+    "steps": 2,
+    "reward": 0.0,
+    "rubric_met": null,
+    "rubric_total": null
+  },
+  {
+    "task_id": "T063_010",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 7,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_SAMPLE_001",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 8,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_015",
+    "ok": false,
+    "error": "Traceback (most recent call last):\n  File \"/usr/lib/python3.10/urllib/request.py\", line 1348, in do_open\n    h.request(req.get_method(), req.selector, req.data, headers,\n  File \"/usr/lib/python3.10/http/client.py\", line 1303, in request\n    self._send_request(method, url, body, headers, encode_chunked)\n  File \"/usr/lib/python3.10/http/client.py\", line 1349, in _send_request\n    self.endheaders(body, encode_chunked=encode_chunked)\n  File \"/usr/lib/python3.10/http/client.py\", line 1298, in endhead"
+  },
+  {
+    "task_id": "T063_020",
+    "ok": true,
+    "termination": "agent_error",
+    "steps": 2,
+    "reward": 0.0,
+    "rubric_met": null,
+    "rubric_total": null
+  },
+  {
+    "task_id": "T063_045",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 7,
+    "reward": 0.7777777777777778,
+    "rubric_met": 7,
+    "rubric_total": 9
+  },
+  {
+    "task_id": "T063_030",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 4,
+    "reward": 1.0,
+    "rubric_met": 8,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_035",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 6,
+    "reward": 0.75,
+    "rubric_met": 6,
+    "rubric_total": 8
+  },
+  {
+    "task_id": "T063_050",
+    "ok": true,
+    "termination": "user_stop",
+    "steps": 4,
+    "reward": 0.6666666666666666,
+    "rubric_met": 6,
+    "rubric_total": 9
+  }
+]

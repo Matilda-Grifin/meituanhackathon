@@ -22,6 +22,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from lifecare.clients.geo_context import locate_by_ip, regeo_location  # noqa: E402
+from lifecare.harness.post_output import should_apply_harness_output, validate_and_repair
+from lifecare.harness.session_state import load_state, on_user_message
 from lifecare.services.itinerary_image import (  # noqa: E402
     JobCancelled,
     cancel_job,
@@ -124,3 +126,50 @@ async def api_itinerary_image(body: ItineraryImageIn, request: Request) -> dict:
 @app.post("/api/itinerary-image/cancel")
 def api_itinerary_image_cancel(body: ItineraryImageCancelIn) -> dict:
     return {"ok": True, "cancelled": cancel_job(body.job_id)}
+
+
+class HarnessUserMessageIn(BaseModel):
+    session_key: str = Field(..., min_length=1, max_length=200)
+    message: str = Field(..., min_length=1, max_length=8000)
+
+
+class HarnessValidateIn(BaseModel):
+    session_key: str = Field(..., min_length=1, max_length=200)
+    text: str = Field(..., min_length=1, max_length=120_000)
+    apply_repairs: bool = True
+
+
+@app.post("/api/harness/on-user-message")
+def api_harness_on_user_message(body: HarnessUserMessageIn) -> dict:
+    state = on_user_message(body.session_key.strip(), body.message)
+    return {
+        "ok": True,
+        "session_key": state.get("session_key"),
+        "stage": state.get("stage"),
+        "slots": state.get("slots"),
+    }
+
+
+@app.post("/api/harness/validate-and-repair")
+def api_harness_validate_and_repair(body: HarnessValidateIn) -> dict:
+    sk = body.session_key.strip()
+    text = body.text
+    if not should_apply_harness_output(text):
+        return {
+            "ok": True,
+            "text": text,
+            "blocked": False,
+            "repairs_applied": [],
+            "violations": [],
+            "skipped": True,
+        }
+    result = validate_and_repair(sk, text, apply_repairs=body.apply_repairs)
+    return result
+
+
+@app.get("/api/harness/state")
+def api_harness_state(session_key: str) -> dict:
+    if not session_key.strip():
+        raise HTTPException(400, "session_key required")
+    st = load_state(session_key.strip())
+    return {"ok": True, "state": st}

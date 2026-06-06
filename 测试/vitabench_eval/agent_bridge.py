@@ -15,11 +15,13 @@ def find_openclaw() -> str | None:
     return shutil.which("openclaw") or shutil.which("openclaw.cmd")
 
 
-def _subprocess_env() -> dict[str, str]:
+def _subprocess_env(*, harness_session_key: str | None = None) -> dict[str, str]:
     from vitabench_eval.llm_client import load_repo_env
 
     load_repo_env()
     env = {k: v for k, v in os.environ.items() if isinstance(v, str)}
+    if harness_session_key:
+        env["LIFECARE_HARNESS_SESSION_KEY"] = harness_session_key.strip()
     if _OPENCLAW_CFG.is_file():
         try:
             cfg = json.loads(_OPENCLAW_CFG.read_text(encoding="utf-8"))
@@ -99,7 +101,7 @@ def run_agent_turn(
             errors="replace",
             timeout=timeout_s,
             cwd=str(_ROOT),
-            env=_subprocess_env(),
+            env=_subprocess_env(harness_session_key=session_id),
         )
     except subprocess.TimeoutExpired:
         return {"error": "timeout", "message": message}

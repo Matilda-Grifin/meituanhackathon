@@ -60,6 +60,20 @@ export function planTextFingerprint(text: string): string {
   return `${t.length}:${head}`;
 }
 
+/** 将 nginx/HTML 等原始错误转为短句（不写进展条，仅供日志） */
+export function formatItineraryImageError(raw: string, httpStatus?: number): string {
+  const t = (raw || "").trim();
+  if (httpStatus === 504 || /504 Gateway Time-out/i.test(t)) {
+    return "网关超时（生图较慢，请稍后重试）";
+  }
+  if (/<html[\s>]/i.test(t)) {
+    const title = t.match(/<title>([^<]+)<\/title>/i)?.[1]?.trim();
+    if (title) return title.replace(/\s+/g, " ");
+    return `HTTP ${httpStatus ?? "error"}`;
+  }
+  return t.slice(0, 120) || "unknown";
+}
+
 export type ItineraryImageResult =
   | { ok: true; image_url: string; timing_ms?: { total?: number } }
   | { ok: false; cancelled?: boolean; error?: string };
@@ -77,7 +91,7 @@ export async function requestItineraryImage(
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    return { ok: false, error: errText.slice(0, 400) || `HTTP ${res.status}` };
+    return { ok: false, error: formatItineraryImageError(errText, res.status) };
   }
   const data = (await res.json()) as ItineraryImageResult & { cancelled?: boolean };
   if (data.cancelled) return { ok: false, cancelled: true };

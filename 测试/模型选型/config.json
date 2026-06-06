@@ -83,7 +83,7 @@
     "agent_eval": {
       "temperature": 0.0,
       "thinking": "medium",
-      "note": "ECS via V63_EVAL_TEMPERATURE / V63_EVAL_THINKING in ecs_switch_model.py"
+      "note": "ECS via V63_EVAL_TEMPERATURE / V63_EVAL_THINKING in ecs_switch_model.py; orchestrator applies lifecare.harness post_output (checklist + POI whitelist) per turn"
     },
     "metrics": {
       "first_response_pass_threshold": 70,

@@ -128,6 +128,16 @@ def main() -> None:
     ap.add_argument("--dry-run-eval", action="store_true")
     ap.add_argument("--retry-failed", action="store_true", help="re-run tasks marked ok=false in batch_progress.json")
     ap.add_argument("--task-id", default="", help="run single task only")
+    ap.add_argument(
+        "--task-ids",
+        default="",
+        help="comma-separated task ids (overrides manifest minus exclude)",
+    )
+    ap.add_argument(
+        "--force",
+        action="store_true",
+        help="re-run even if run.json exists (use with --task-id / --task-ids)",
+    )
     args = ap.parse_args()
 
     exclude = {x.strip() for x in args.exclude.split(",") if x.strip()}
@@ -136,7 +146,9 @@ def main() -> None:
     progress_path = out_dir / "batch_progress.json"
     summary_path = out_dir / "batch_summary.json"
 
-    if args.task_id:
+    if args.task_ids.strip():
+        task_ids = [x.strip() for x in args.task_ids.split(",") if x.strip()]
+    elif args.task_id:
         task_ids = [args.task_id]
     else:
         task_ids = _load_task_ids(exclude)
@@ -155,6 +167,9 @@ def main() -> None:
         done_ids -= retry_ids
         if retry_ids:
             print(f"retry_failed: {sorted(retry_ids)}", flush=True)
+    if args.force:
+        done_ids -= set(task_ids)
+        print(f"force: re-run {task_ids}", flush=True)
 
     print(f"batch start: {len(task_ids)} tasks, exclude={exclude}, out={out_dir}", flush=True)
     print(
@@ -163,7 +178,7 @@ def main() -> None:
         flush=True,
     )
     for i, tid in enumerate(task_ids, 1):
-        force = tid in retry_ids
+        force = tid in retry_ids or args.force
         if tid in done_ids and not force:
             print(f"[{i}/{len(task_ids)}] skip (run.json exists) {tid}", flush=True)
             continue

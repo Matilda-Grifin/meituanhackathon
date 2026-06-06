@@ -6,6 +6,7 @@ from typing import Any
 
 from vitabench_eval.agent_bridge import format_environment_block, run_agent_turn
 from vitabench_eval.env_runner import McpLogTracker, count_mcp_errors, entries_to_tool_messages
+from vitabench_eval.harness_bridge import apply_harness_post_output, prepare_harness_turn
 from vitabench_eval.user_simulator import STOP, UserSimulator
 
 EARLY_ZERO = frozenset({"max_steps", "too_many_errors", "agent_error", "invalid_agent_message"})
@@ -34,6 +35,7 @@ def run_simulation(
     )
     mcp_tracker = McpLogTracker()
     trajectory: list[dict] = []
+    harness_turns: list[dict] = []
     termination = "unknown"
     num_errors = 0
     step = 0
@@ -41,10 +43,27 @@ def run_simulation(
 
     user_msg = user_sim.first_message()
     trajectory.append({"role": "user", "content": user_msg, "turn": 1})
+    if UserSimulator.is_stop(user_msg):
+        termination = "user_stop"
+        step = 0
 
-    while step < max_steps:
+    while step < max_steps and termination == "unknown":
         step += 1
+        if UserSimulator.is_empty(user_msg):
+            user_msg = STOP
+            trajectory.append(
+                {
+                    "role": "user",
+                    "content": user_msg,
+                    "turn": step,
+                    "empty_user_replaced": True,
+                }
+            )
+            termination = "user_stop"
+            break
+
         inject = env_block if step == 1 else None
+        prepare_harness_turn(session_id, user_msg)
         agent_out = run_agent_turn(
             user_msg,
             session_id=session_id,
@@ -65,9 +84,9 @@ def run_simulation(
             termination = "agent_error"
             break
 
-        asst_text = agent_out.get("assistant_text") or ""
+        asst_text_raw = agent_out.get("assistant_text") or ""
         has_tools = bool(agent_out.get("tools") or agent_out.get("tool_calls"))
-        if not asst_text.strip() and not has_tools:
+        if not asst_text_raw.strip() and not has_tools:
             num_errors += 1
             termination = "invalid_agent_message"
             trajectory.append(
@@ -84,6 +103,17 @@ def run_simulation(
                 "time_to_first_progress_ms"
             )
 
+        mcp_entries = mcp_tracker.drain_new_entries()
+        harness = apply_harness_post_output(session_id, asst_text_raw)
+        asst_text = harness.get("text") or asst_text_raw
+        harness_meta = {
+            "skipped": harness.get("skipped"),
+            "repairs_applied": harness.get("repairs_applied") or [],
+            "checklist_missing": harness.get("checklist_missing") or [],
+            "poi_audit": harness.get("poi_audit") or {},
+        }
+        harness_turns.append({"turn": step, **harness_meta})
+
         trajectory.append(
             {
                 "role": "assistant",
@@ -93,11 +123,12 @@ def run_simulation(
                 "tool_calls": agent_out.get("tool_calls") or [],
                 "time_to_first_assistant_text_ms": agent_out.get("time_to_first_assistant_text_ms"),
                 "duration_ms": agent_out.get("duration_ms"),
+                "harness": harness_meta,
+                "assistant_text_raw": asst_text_raw if asst_text_raw != asst_text else None,
             }
         )
 
         # Env step: merge MCP JSONL tool results for judge visibility
-        mcp_entries = mcp_tracker.drain_new_entries()
         tool_msgs = entries_to_tool_messages(mcp_entries)
         for tm in tool_msgs:
             trajectory.append({**tm, "turn": step})
@@ -115,13 +146,16 @@ def run_simulation(
             break
 
         user_msg = user_sim.respond(asst_text)
+        if UserSimulator.is_empty(user_msg):
+            user_msg = STOP
         trajectory.append({"role": "user", "content": user_msg, "turn": step + 1})
 
         if UserSimulator.is_stop(user_msg):
             termination = "user_stop"
             break
     else:
-        termination = "max_steps"
+        if termination == "unknown":
+            termination = "max_steps"
 
     reward_info: dict[str, Any]
     if termination in EARLY_ZERO:
@@ -146,6 +180,14 @@ def run_simulation(
         "max_steps": max_steps,
         "max_errors": max_errors,
         "trajectory": trajectory,
+        "harness_summary": {
+            "turns": harness_turns,
+            "repairs_total": sum(len(t.get("repairs_applied") or []) for t in harness_turns),
+            "checklist_miss_total": sum(len(t.get("checklist_missing") or []) for t in harness_turns),
+            "poi_replacements_total": sum(
+                len((t.get("poi_audit") or {}).get("replacements") or []) for t in harness_turns
+            ),
+        },
         "reward_info": reward_info,
         "first_response": fr,
     }

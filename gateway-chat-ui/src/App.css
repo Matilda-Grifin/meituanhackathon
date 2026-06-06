@@ -5,8 +5,8 @@
   font-family: system-ui, sans-serif;
   color: #e8eaed;
   background: #0f1115;
-  height: 100vh;
-  max-height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -283,8 +283,9 @@ button.danger {
 .stream {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
   overflow-x: hidden;
+  scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -1000,8 +1001,10 @@ button.danger {
 
 .composer textarea {
   font: inherit;
-  resize: vertical;
+  resize: none;
+  height: 4.5rem;
   min-height: 4.5rem;
+  max-height: 4.5rem;
   padding: 0.55rem;
   border-radius: 8px;
   border: 1px solid #3c4454;

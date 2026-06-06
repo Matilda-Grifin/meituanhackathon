@@ -9,7 +9,10 @@ function isItineraryImageBubbleText(text: string): boolean {
 function isClientOnlyAssistantRow(row: ChatRow): boolean {
   if (normRole(row.role) !== "assistant") return false;
   if (isItineraryImageBubbleText(row.text)) return true;
-  return row.id.startsWith("a-img-");
+  if (row.id.startsWith("a-img-")) return true;
+  /** 工具调用前 early-flush 的首响 ack；history 滞后时须保留，避免闪退 */
+  if (row.id.startsWith("a-ack-")) return true;
+  return false;
 }
 
 function normRole(role: string): string {
@@ -139,6 +142,45 @@ function appendTrailingFromPrevious(previous: ChatRow[], reconciled: ChatRow[]):
   return [...reconciled, ...trailingExtra];
 }
 
+/** 保留 previous 中任意位置的客户端专属 assistant 行（生图 / early-ack），避免多轮对话后被 reconcile 丢掉 */
+function preserveClientOnlyAssistantRows(previous: ChatRow[], merged: ChatRow[]): ChatRow[] {
+  if (!previous.length) return merged;
+
+  const presentIds = new Set(merged.map((r) => r.id));
+  const presentKeys = new Set(
+    merged.map((r) => rowIdentityKey(r)).filter((k): k is string => Boolean(k)),
+  );
+
+  const orphans = previous.filter((r) => {
+    if (!isClientOnlyAssistantRow(r)) return false;
+    if (presentIds.has(r.id)) return false;
+    const key = rowIdentityKey(r);
+    if (key && presentKeys.has(key)) return false;
+    return true;
+  });
+  if (!orphans.length) return merged;
+
+  let result = [...merged];
+  for (const orphan of orphans) {
+    const origIdx = previous.indexOf(orphan);
+    let insertAfter = -1;
+    for (let i = origIdx - 1; i >= 0; i--) {
+      const pr = previous[i]!;
+      const prKey = rowIdentityKey(pr);
+      const idxInResult = result.findIndex(
+        (r) => r.id === pr.id || (prKey != null && rowIdentityKey(r) === prKey),
+      );
+      if (idxInResult >= 0 && normRole(pr.role) === "assistant") {
+        insertAfter = idxInResult;
+        break;
+      }
+    }
+    if (insertAfter >= 0) result.splice(insertAfter + 1, 0, orphan);
+    else result.push(orphan);
+  }
+  return result;
+}
+
 /**
  * Merge server history with on-screen rows. Never shrink to empty when previous has content.
  */
@@ -159,6 +201,7 @@ export function reconcileChatRows(
 
   let merged = reconcileIds(previous, incoming);
   merged = appendTrailingFromPrevious(previous, merged);
+  merged = preserveClientOnlyAssistantRows(previous, merged);
   merged = appendPendingUser(merged, pending);
   return dedupeAdjacentAssistant(merged);
 }

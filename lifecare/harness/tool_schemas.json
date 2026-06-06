@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "tools": {
+    "lifecare_search_places": {
+      "required": ["keywords"],
+      "optional": ["city", "limit", "extensions", "attach_mock_reputation"],
+      "types": {
+        "keywords": "str_nonempty",
+        "city": "str",
+        "limit": "int_1_20",
+        "extensions": "str"
+      }
+    },
+    "lifecare_get_weather": {
+      "required": [],
+      "optional": ["city", "latitude", "longitude", "forecast_days"],
+      "types": {
+        "city": "str",
+        "latitude": "number",
+        "longitude": "number",
+        "forecast_days": "int_1_16"
+      },
+      "at_least_one_of": ["city", "latitude"]
+    },
+    "lifecare_plan_route": {
+      "required": ["origin_lng", "origin_lat", "dest_lng", "dest_lat"],
+      "optional": [],
+      "types": {
+        "origin_lng": "number",
+        "origin_lat": "number",
+        "dest_lng": "number",
+        "dest_lat": "number"
+      }
+    }
+  }
+}

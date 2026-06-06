@@ -57,14 +57,11 @@ export function isAckMessage(text: string): boolean {
   return /好的|收到|明白|正在查|正在并行|搜点|检索地点|重新规划|改成|改为/.test(t);
 }
 
-/** 流式阶段：ack 句已完整，可提前 flush（选 A） */
+/** 流式阶段：isAckMessage 即 flush，不再要求句号或等工具开始 */
 export function shouldEarlyFlushAck(text: string): boolean {
   const t = text.trim();
-  if (!t || isPlanMessage(t)) return false;
-  if (!isAckMessage(t)) return false;
-  if (/正在查|正在并行|搜点|检索地点/.test(t) && /[。！…\n]/.test(t)) return true;
-  if (t.length >= 40 && /[。！…]$/.test(t)) return true;
-  return false;
+  if (!t || isPlanMessage(t) || isIntakeQuestionText(t)) return false;
+  return isAckMessage(t);
 }
 
 export function stripLeadingAckFromPlan(plan: string, ack?: string): string {
@@ -166,14 +163,15 @@ function mergeAssistantGroup(items: ChatRow[]): ChatRow[] {
 
   const ackCandidates = src.filter((r) => isAckMessage(r.text));
   const planCandidates = src.filter((r) => isPlanMessage(r.text));
-  const ack = ackCandidates[0] ?? null;
+  const ack = ackCandidates.sort((a, b) => b.text.length - a.text.length)[0] ?? null;
+  const ackIds = new Set(ackCandidates.map((r) => r.id));
   let plan = planCandidates.sort((a, b) => b.text.length - a.text.length)[0] ?? null;
 
   const usedIds = new Set<string>();
   if (ack) usedIds.add(ack.id);
   if (plan) usedIds.add(plan.id);
 
-  const rest = src.filter((r) => !usedIds.has(r.id));
+  const rest = src.filter((r) => !usedIds.has(r.id) && !ackIds.has(r.id));
 
   if (!plan && !ack) {
     if (src.length === 1) return [...others, ...src, ...imageRows];
@@ -182,9 +180,6 @@ function mergeAssistantGroup(items: ChatRow[]): ChatRow[] {
   }
 
   const out: ChatRow[] = [...others];
-  if (ack) {
-    out.push({ ...ack, text: ack.text.trim() });
-  }
   if (plan) {
     const text = stripLeadingAckFromPlan(plan.text, ack?.text);
     if (text.trim() && !isEmptyAssistantPlaceholder(text)) {

@@ -1,0 +1,149 @@
+version: 1
+domain: lifecare_travel
+
+stages:
+  light_weather:
+    allow_tools:
+      - lifecare_get_weather
+    deny_tools:
+      - lifecare_search_places
+      - lifecare_plan_route
+
+  chitchat:
+    allow_tools: []
+    deny_tools:
+      - lifecare_search_places
+      - lifecare_plan_route
+      - lifecare_get_weather
+
+  intake:
+    allow_tools:
+      - lifecare_get_weather
+    deny_tools:
+      - lifecare_search_places
+      - lifecare_plan_route
+    optional_tools:
+      - lifecare_sandbox_catalog
+      - lifecare_get_venue_queue
+      - lifecare_get_attraction_crowd
+      - lifecare_ride_estimate
+      - lifecare_submit_mock_order
+      - lifecare_inject_sandbox_failure
+    required_output:
+      - intake_questions
+
+  planning:
+    allow_tools:
+      - lifecare_get_weather
+      - lifecare_search_places
+      - lifecare_plan_route
+    optional_tools:
+      - lifecare_sandbox_catalog
+      - lifecare_get_venue_queue
+      - lifecare_get_attraction_crowd
+      - lifecare_ride_estimate
+      - lifecare_submit_mock_order
+      - lifecare_inject_sandbox_failure
+
+  followup_qa:
+    allow_tools: []
+    optional_tools:
+      - lifecare_get_weather
+      - lifecare_search_places
+      - lifecare_plan_route
+
+  followup_replan:
+    allow_tools:
+      - lifecare_get_weather
+      - lifecare_search_places
+      - lifecare_plan_route
+    optional_tools:
+      - lifecare_sandbox_catalog
+      - lifecare_get_venue_queue
+      - lifecare_get_attraction_crowd
+
+tool_budget:
+  base_total: 12
+  per_extra_day: 6
+  search_cap: 12
+  weather_cap: 6
+  half_day_route_cap: 3
+
+context_rules:
+  - id: slots_incomplete
+    when: not_slots_ready
+    force_stage: intake
+  - id: planning_ready
+    when: slots_ready_no_plan
+    force_stage: planning
+  - id: followup_replan
+    when: has_plan_replan_intent
+    force_stage: followup_replan
+  - id: followup_qa
+    when: has_plan_qa_intent
+    force_stage: followup_qa
+
+output_forbidden:
+  - id: no_preset_party_size
+    when: not_party_size
+    patterns:
+      - "为您安排\\d+人"
+      - "\\d+人朋友局"
+      - "我们\\d+个朋友"
+    severity: error
+
+  - id: no_fake_realtime_after_tool_fail
+    when: tools_degraded
+    patterns:
+      - "驾车约\\d+分钟"
+      - "气温\\d+°"
+      - "评分\\d\\.\\d"
+    severity: error
+
+  - id: no_fake_amap_when_search_degraded
+    when: search_degraded
+    patterns:
+      - "amap\\.com/place/"
+    severity: error
+
+  - id: no_fake_temp_when_weather_degraded
+    when: weather_degraded
+    patterns:
+      - "气温\\d+"
+      - "\\d+°C"
+      - "\\d+℃"
+    severity: error
+
+  - id: no_claim_real_dianping_volume
+    when: mentions_reviews
+    patterns:
+      - "\\d+条评价"
+      - "真实点评"
+      - "美团评论"
+    unless_contains:
+      - 演示
+      - mock
+      - 代理
+      - 合成
+    severity: warn
+
+output_required:
+  - id: mock_disclaimer
+    when: uses_mock_reputation
+    insert: footer
+    template_id: mock_data_notice
+
+  - id: budget_estimate_notice
+    when: has_budget_table
+    insert: after_budget
+    template_id: budget_estimate_notice
+
+  - id: tool_degraded_notice
+    when: tools_degraded
+    insert: top
+    template_id: no_realtime_data_notice
+
+  - id: booking_reminder
+    when: has_museum_or_booking_section
+    insert: after_booking_section
+    template_id: booking_reminder

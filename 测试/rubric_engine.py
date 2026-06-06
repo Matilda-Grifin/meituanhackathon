@@ -194,6 +194,14 @@ def evaluate_case(case: dict, pred: dict, rubric: dict | None = None) -> dict:
         },
     )
 
+    harness_m: dict = {}
+    try:
+        from harness_eval import evaluate_pred_harness
+
+        harness_m = evaluate_pred_harness(case, pred)
+    except Exception as e:  # pragma: no cover
+        harness_m = {"harness_error": str(e)}
+
     return {
         "case_id": case.get("case_id"),
         "difficulty": case.get("difficulty"),
@@ -215,6 +223,7 @@ def evaluate_case(case: dict, pred: dict, rubric: dict | None = None) -> dict:
         "failures": [f"{r['rule_id']}:{r['detail']}" for r in fails],
         "tools_vs_framework": tools_fw,
         "failure_hints": pred.get("failure_hints") or [],
+        "harness": harness_m,
     }
 
 

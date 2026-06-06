@@ -124,6 +124,8 @@ def _merge_config(inject: dict[str, str]) -> None:
         "env": {
             "MOCK_SANDBOX_BASE_URL": env.get("MOCK_SANDBOX_BASE_URL", "http://127.0.0.1:9000"),
             "AMAP_KEY": env.get("AMAP_KEY", ""),
+            "LIFECARE_HARNESS_LOG": "1",
+            "LIFECARE_HARNESS_STATE_DIR": "/root/.openclaw/harness_state",
         },
     }
 

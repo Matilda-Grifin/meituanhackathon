@@ -67,6 +67,11 @@ def sync_to_ecs(cfg: dict) -> None:
     subprocess.check_call(
         ["scp", "-o", "BatchMode=yes", str(_ROOT / "run_mcp.py"), f"{host}:{repo}/"]
     )
+    harness = _ROOT / "lifecare" / "harness"
+    if harness.is_dir():
+        subprocess.check_call(
+            ["scp", "-r", "-o", "BatchMode=yes", str(harness), f"{host}:{repo}/lifecare/"]
+        )
     subprocess.check_call(
         ["scp", "-o", "BatchMode=yes", str(_ROOT / "lifecare" / "mcp_tool_log.py"), f"{host}:{repo}/lifecare/"]
     )
@@ -74,6 +79,21 @@ def sync_to_ecs(cfg: dict) -> None:
     if soul.is_file():
         subprocess.check_call(
             ["scp", "-o", "BatchMode=yes", str(soul), f"{host}:{repo}/workspace/"]
+        )
+    skill = _ROOT / "workspace" / "skills" / "local-itinerary-planner" / "SKILL.md"
+    if skill.is_file():
+        _ssh(
+            host,
+            f"mkdir -p {repo}/workspace/skills/local-itinerary-planner {repo}/.openclaw/workspace/skills/local-itinerary-planner 2>/dev/null; true",
+        )
+        subprocess.check_call(
+            [
+                "scp",
+                "-o",
+                "BatchMode=yes",
+                str(skill),
+                f"{host}:{repo}/workspace/skills/local-itinerary-planner/",
+            ]
         )
     subprocess.check_call(
         ["scp", "-r", "-o", "BatchMode=yes", str(_V63_DATA / "tasks"), f"{host}:{tasks_remote}/"]

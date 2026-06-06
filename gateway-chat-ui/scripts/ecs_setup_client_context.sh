@@ -118,6 +118,33 @@ PY
   systemctl reload nginx
 fi
 
+# 行程信息图：LLM 抽取 + Seedream 常 >60s，/api/ 需拉长 nginx 超时（默认 60s → 504）
+if [ -n "$CONF" ]; then
+  export CONF
+  python3 << 'PY'
+import pathlib, re, os
+conf_path = os.environ.get("CONF", "")
+p = pathlib.Path(conf_path)
+if not p.is_file():
+    print("skip api timeout patch:", conf_path)
+else:
+    text = p.read_text(encoding="utf-8")
+    if "location /api/" in text and "proxy_read_timeout 360" not in text:
+        text = re.sub(
+            r"(location /api/\s*\{[^}]*?proxy_set_header X-Forwarded-Proto[^\n]+\n)",
+            r"\1        proxy_read_timeout 360s;\n        proxy_send_timeout 360s;\n",
+            text,
+            flags=re.DOTALL,
+        )
+        p.write_text(text, encoding="utf-8")
+        print("patched api timeouts in", conf_path)
+    else:
+        print("api timeouts ok in", conf_path)
+PY
+  nginx -t
+  systemctl reload nginx
+fi
+
 echo -n "health: "
 curl -sf http://127.0.0.1:8098/health && echo
 echo -n "api: "

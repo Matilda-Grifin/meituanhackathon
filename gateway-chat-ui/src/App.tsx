@@ -34,9 +34,24 @@ import {
   rowsHasItineraryImage,
   toolEventUsedSearchPlaces,
 } from "./itineraryImage";
+import {
+  appendPersistedItineraryImage,
+  persistItineraryImageRow,
+  sessionHasPersistedItineraryImage,
+} from "./itineraryImageStorage";
+import { notifyHarnessUserMessage, requestHarnessRepair } from "./harnessClient";
 import { BubbleMarkdown } from "./BubbleMarkdown";
 import { MarkdownErrorBoundary } from "./MarkdownErrorBoundary";
 import { StreamingPlainText } from "./StreamingPlainText";
+import { StreamingMarkdown } from "./StreamingMarkdown";
+import { shouldStreamMarkdown } from "./streamMarkdown";
+import {
+  isWarmupMessage,
+  shouldStartWarmup,
+  WARMUP_MESSAGE,
+  WARMUP_TIMEOUT_MS,
+  type WarmupState,
+} from "./sessionWarmup";
 import { IntakeCard } from "./IntakeCard";
 import {
   extractIntakeOnlyText,
@@ -52,17 +67,20 @@ import {
 } from "./assistantPlaceholders";
 import {
   extractRunId,
+  isAckMessage,
   isPlanMessage,
   liveStreamDisplayText,
   indexOfFirstVisibleUser,
+  isVisibleUserRow,
   presentChatRows,
   shouldEarlyFlushAck,
-  isAckMessage,
 } from "./presentChatRows";
 import {
   appendProcessStep,
+  appendToolProgressStep,
   appendToolStepsFromPayload,
   historyDataUsedSearchPlaces,
+  labelForTool,
   type ProcessStep,
 } from "./toolProgress";
 
@@ -155,9 +173,12 @@ function isRawToolPayloadText(text: string): boolean {
 function isHiddenChatRow(role: string, text: string): boolean {
   const rl = String(role).toLowerCase();
   if (rl === "user" && isLocationContextMessage(text)) return true;
+  if (rl === "user" && isWarmupMessage(text)) return true;
+  if (rl === "user" && isIntakeDisplayHiddenUserRow(text)) return true;
   if (rl === "tool" || rl === "toolresult") return true;
   if (isRawToolPayloadText(text)) return true;
   if (rl === "assistant" && isNoiseAssistantBubble(stripAssistantToolNoise(text))) return true;
+  if (rl === "assistant" && isAckMessage(text) && !isPlanMessage(text)) return true;
   return false;
 }
 
@@ -207,12 +228,10 @@ function appendToolTimeline(
       msg = "命令行 / exec 步骤";
     } else if (/session\.tool|tool\.|invoke/i.test(ev)) {
       msg = `工具事件：${ev}`;
-    } else if (!/^chat$/i.test(ev) && raw.length > 8 && /tool|lifecare|mcp/i.test(raw)) {
-      msg = `[${ev}] ${raw.slice(0, 100)}${raw.length > 100 ? "…" : ""}`;
     }
   }
   if (!msg) return prev;
-  return appendProcessStep(prev, msg);
+  return appendToolProgressStep(prev, msg, seenTools);
 }
 
 function shouldSkipHistoryMessage(m: Record<string, unknown>, text: string, role: string): boolean {
@@ -221,6 +240,7 @@ function shouldSkipHistoryMessage(m: Record<string, unknown>, text: string, role
   if (customType.includes("runtime-context") || customType === "openclaw.runtime-context") return true;
   const rlow = String(role).toLowerCase();
   if (rlow === "user" && isLocationContextMessage(text)) return true;
+  if (rlow === "user" && isWarmupMessage(text)) return true;
   if (/Sender \(untrusted metadata\)/i.test(text) && /webchat-ui/i.test(text)) return true;
   if (rlow === "user" && /^Conversation info \(untrusted metadata\)/i.test(text)) return true;
   return false;
@@ -363,24 +383,96 @@ function isIntakeQuestionBubble(text: string): boolean {
   return hasIntakeQuestions(intakeOnly) && text.trim() === intakeOnly;
 }
 
-function findIntakeAnchorUserId(rows: ChatRow[]): string | null {
-  for (let i = 0; i < rows.length; i++) {
+type IntakeSubmittedSnapshot = {
+  blocks: IntakeBlock[];
+  selections: Record<number, string>;
+  custom: Record<number, string>;
+  followUp: Record<number, string>;
+};
+
+/** 当前轮次：最后一条可见、非「选择题答案」的用户消息 */
+function findCurrentTurnAnchorIdx(rows: ChatRow[]): number {
+  for (let i = rows.length - 1; i >= 0; i--) {
     const r = rows[i]!;
-    if (String(r.role).toLowerCase() !== "assistant") continue;
-    const intakeOnly = extractIntakeOnlyText(r.text);
-    if (!hasIntakeQuestions(intakeOnly)) continue;
-    for (let j = i - 1; j >= 0; j--) {
-      const u = rows[j]!;
-      if (String(u.role).toLowerCase() !== "user") continue;
-      if (isIntakeSubmissionText(u.text)) continue;
-      return u.id;
+    if (!isVisibleUserRow(r)) continue;
+    if (isIntakeSubmissionText(r.text)) continue;
+    return i;
+  }
+  return -1;
+}
+
+function findIntakeAnchorUserId(rows: ChatRow[]): string | null {
+  const idx = findCurrentTurnAnchorIdx(rows);
+  return idx >= 0 ? rows[idx]!.id : null;
+}
+
+/** 仅在本轮 anchor 之后、下一条新用户消息之前查找槽位提交 */
+function findIntakeSubmissionInTurn(
+  rows: ChatRow[],
+  anchorIdx: number,
+): { submissionIdx: number; assistantIdx: number } | null {
+  let nextTurnUserIdx = rows.length;
+  for (let i = anchorIdx + 1; i < rows.length; i++) {
+    const r = rows[i]!;
+    if (!isVisibleUserRow(r)) continue;
+    if (!isIntakeSubmissionText(r.text)) {
+      nextTurnUserIdx = i;
+      break;
+    }
+  }
+  for (let i = anchorIdx + 1; i < nextTurnUserIdx; i++) {
+    const r = rows[i]!;
+    if (String(r.role).toLowerCase() !== "user" || !isIntakeSubmissionText(r.text)) continue;
+    for (let j = i - 1; j > anchorIdx; j--) {
+      const a = rows[j]!;
+      if (String(a.role).toLowerCase() !== "assistant") continue;
+      if (parseQuestionBlocks(extractIntakeOnlyText(a.text)).length > 0) {
+        return { submissionIdx: i, assistantIdx: j };
+      }
+    }
+    if (/^全部用默认/.test(r.text.trim())) {
+      return { submissionIdx: i, assistantIdx: -1 };
     }
   }
   return null;
 }
 
+function buildTurnSubmittedIntake(rows: ChatRow[], anchorIdx: number): IntakeSubmittedSnapshot | null {
+  const hit = findIntakeSubmissionInTurn(rows, anchorIdx);
+  if (!hit) return null;
+  const u = rows[hit.submissionIdx]!;
+  if (/^全部用默认/.test(u.text.trim())) {
+    return null;
+  }
+  if (hit.assistantIdx < 0) return null;
+  const a = rows[hit.assistantIdx]!;
+  const blocks = parseQuestionBlocks(extractIntakeOnlyText(a.text));
+  if (!blocks.length) return null;
+  const { selections, custom, followUp } = parseIntakeSubmissionSelections(u.text);
+  return { blocks, selections, custom, followUp };
+}
+
 function isIntakeSubmissionText(text: string): boolean {
   return /^选择题答案：/.test(text.trim()) || /^全部用默认/.test(text.trim());
+}
+
+/** 槽位提交/API 载荷用户行：不在对话区单独展示（保留在 intake 卡片内） */
+function isIntakeDisplayHiddenUserRow(text: string): boolean {
+  const t = text.trim();
+  return isIntakeSubmissionText(t) || /^已选：/.test(t);
+}
+
+function findSessionPlanningIntake(
+  rows: ChatRow[],
+): { anchorId: string; snapshot: IntakeSubmittedSnapshot } | null {
+  let found: { anchorId: string; snapshot: IntakeSubmittedSnapshot } | null = null;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]!;
+    if (!isVisibleUserRow(r) || isIntakeSubmissionText(r.text)) continue;
+    const snap = buildTurnSubmittedIntake(rows, i);
+    if (snap) found = { anchorId: r.id, snapshot: snap };
+  }
+  return found;
 }
 
 function extractAgentStreamHint(payload: unknown): string | null {
@@ -394,12 +486,20 @@ function extractAgentStreamHint(payload: unknown): string | null {
     if (phase === "start") return "开始执行本轮任务";
     if (phase === "end") return null;
   }
+  if (stream === "item" && data) {
+    const name =
+      (typeof data.tool === "string" && data.tool) ||
+      (typeof data.name === "string" && data.name) ||
+      (typeof data.toolName === "string" && data.toolName);
+    if (name) return labelForTool(name);
+    return null;
+  }
   if ((stream === "tool" || stream === "tool_use" || stream === "tool-call") && data) {
     const name =
       (typeof data.tool === "string" && data.tool) ||
       (typeof data.name === "string" && data.name) ||
       (typeof data.toolName === "string" && data.toolName);
-    if (name) return `调用工具：${name}`;
+    if (name) return labelForTool(name);
   }
   const raw = JSON.stringify(data ?? p);
   if (/lifecare__/i.test(raw)) {
@@ -500,28 +600,6 @@ function formatIntakeSubmission(
   return `选择题答案：${parts.join("；")}`;
 }
 
-function formatIntakeSubmissionReadable(
-  blocks: IntakeBlock[],
-  selections: Record<number, string>,
-  custom: Record<number, string>,
-  followUp: Record<number, string>,
-): string {
-  const parts = blocks
-    .map((b) => {
-      const letter = selections[b.n];
-      if (!letter) return "";
-      const opt = b.options.find((o) => o.letter === letter);
-      const fu = (followUp[b.n] ?? "").trim();
-      if (fu) return fu;
-      const hint = opt?.isOther ? (custom[b.n] ?? "").trim() : (opt?.hint ?? letter);
-      return hint ? hint : `第${b.n}题 ${letter}`;
-    })
-    .filter(Boolean);
-  return parts.length
-    ? `已选：${parts.join("；")}`
-    : formatIntakeSubmission(blocks, selections, custom, followUp);
-}
-
 function parseIntakeSubmissionSelections(text: string): {
   selections: Record<number, string>;
   custom: Record<number, string>;
@@ -545,13 +623,6 @@ function parseIntakeSubmissionSelections(text: string): {
   }
   return { selections, custom, followUp };
 }
-
-type IntakeSubmittedSnapshot = {
-  blocks: IntakeBlock[];
-  selections: Record<number, string>;
-  custom: Record<number, string>;
-  followUp: Record<number, string>;
-};
 
 /** 网关 chat 事件里可能出现的思考/推理增量（豆包等会走独立字段）。 */
 function extractThinkingDelta(payload: unknown): string | null {
@@ -1028,6 +1099,7 @@ export default function App() {
   );
   const stopHistoryPollRef = useRef<() => void>(() => {});
   const streamScrollRef = useRef<HTMLDivElement | null>(null);
+  const streamPinnedToBottomRef = useRef(true);
   const processLogRef = useRef<HTMLDivElement | null>(null);
   const threadsBootstrapped = useRef(false);
   const firstSessionCreating = useRef(false);
@@ -1045,6 +1117,14 @@ export default function App() {
   const locationInjectedSessions = useRef<Set<string>>(new Set());
   const locationInjectInFlightRef = useRef<Map<string, Promise<boolean>>>(new Map());
   const locationRefreshInFlightRef = useRef(false);
+  const warmupInFlightRef = useRef(false);
+  const warmupDoneSessions = useRef<Set<string>>(new Set());
+  const warmupPromiseRef = useRef<Promise<void> | null>(null);
+  const warmupResolveRef = useRef<(() => void) | null>(null);
+  const warmupStateRef = useRef<WarmupState>("idle");
+  const finishWarmupRunRef = useRef<(sk: string) => void>(() => {});
+  const startSessionWarmupRef = useRef<() => void>(() => {});
+  const ensureWarmupCompleteRef = useRef<(timeoutMs?: number) => Promise<void>>(async () => {});
 
   const appEnabled = locationConsent === "granted";
   const showLocationConsent = locationConsent === "pending";
@@ -1087,14 +1167,7 @@ export default function App() {
       return "";
     }
 
-    let anchorUserIdx = -1;
-    for (let i = rows.length - 1; i >= 0; i--) {
-      const r = rows[i]!;
-      if (String(r.role).toLowerCase() !== "user") continue;
-      if (isIntakeSubmissionText(r.text)) continue;
-      anchorUserIdx = i;
-      break;
-    }
+    const anchorUserIdx = findCurrentTurnAnchorIdx(rows);
     if (anchorUserIdx < 0) return "";
 
     for (let i = anchorUserIdx + 1; i < rows.length; i++) {
@@ -1117,82 +1190,96 @@ export default function App() {
   const intakeBlocks = intakeSurvey.blocks;
   const intakeIntro = intakeSurvey.intro;
 
+  const currentTurnAnchorIdx = useMemo(() => findCurrentTurnAnchorIdx(rows), [rows]);
+  const currentTurnAnchorId = useMemo(
+    () => (currentTurnAnchorIdx >= 0 ? rows[currentTurnAnchorIdx]!.id : null),
+    [rows, currentTurnAnchorIdx],
+  );
+
+  const turnSubmittedIntake = useMemo((): IntakeSubmittedSnapshot | null => {
+    if (currentTurnAnchorIdx < 0) return null;
+    return buildTurnSubmittedIntake(rows, currentTurnAnchorIdx);
+  }, [rows, currentTurnAnchorIdx]);
+
+  const sessionPlanningIntake = useMemo(() => findSessionPlanningIntake(rows), [rows]);
+
   useEffect(() => {
-    if (intakeSubmitted || lastUserIsIntakeSubmission) return;
+    if (turnSubmittedIntake || lastUserIsIntakeSubmission) return;
+    if (currentTurnAnchorIdx < 0) {
+      setFrozenIntake(null);
+      setFrozenIntakeIntro("");
+      setIntakeFocusQ(null);
+      return;
+    }
     if (intakeBlocks.length > 0) {
-      setFrozenIntake((prev) => mergeIntakeBlocks(prev, intakeBlocks));
-      if (intakeIntro) setFrozenIntakeIntro((prev) => (intakeIntro.length >= prev.length ? intakeIntro : prev));
-    } else if (!streaming.trim() && !intakeSubmitted && !awaitingAgent) {
+      setFrozenIntake(intakeBlocks);
+      if (intakeIntro) setFrozenIntakeIntro(intakeIntro);
+    } else if (!streaming.trim()) {
       setFrozenIntake(null);
       setFrozenIntakeIntro("");
       setIntakeFocusQ(null);
     }
-  }, [intakeBlocks, intakeIntro, streaming, intakeSubmitted, lastUserIsIntakeSubmission, awaitingAgent]);
+  }, [
+    intakeBlocks,
+    intakeIntro,
+    currentTurnAnchorIdx,
+    streaming,
+    lastUserIsIntakeSubmission,
+    turnSubmittedIntake,
+  ]);
 
   const displayIntakeIntro = frozenIntakeIntro || intakeIntro;
 
-  const displayIntakeBlocks = useMemo(() => {
-    if (intakeSubmitted || lastUserIsIntakeSubmission) {
-      return submittedIntake?.blocks ?? [];
+  const persistedIntakeSnapshot = sessionPlanningIntake?.snapshot ?? null;
+  const effectiveSubmittedIntake =
+    turnSubmittedIntake ?? persistedIntakeSnapshot ?? (intakeSubmitted ? submittedIntake : null);
+  const intakeLocked = Boolean(effectiveSubmittedIntake) || lastUserIsIntakeSubmission;
+
+  const displayIntakeBlocksResolved = useMemo(() => {
+    if (intakeLocked && effectiveSubmittedIntake?.blocks.length) {
+      return effectiveSubmittedIntake.blocks;
     }
     const merged = mergeIntakeBlocks(frozenIntake, intakeBlocks);
     return merged.length > 0 ? merged : [];
-  }, [frozenIntake, intakeBlocks, intakeSubmitted, lastUserIsIntakeSubmission, submittedIntake]);
+  }, [effectiveSubmittedIntake, frozenIntake, intakeBlocks, intakeLocked]);
 
-  const intakeCardBlocks = displayIntakeBlocks;
+  const intakeCardBlocks = displayIntakeBlocksResolved;
 
-  const intakeLocked = intakeSubmitted || lastUserIsIntakeSubmission;
-
-  const cardSelections = intakeLocked && submittedIntake ? submittedIntake.selections : intakeSelections;
+  const cardSelections =
+    intakeLocked && effectiveSubmittedIntake ? effectiveSubmittedIntake.selections : intakeSelections;
 
   const showIntakeCard =
     connected &&
-    (displayIntakeBlocks.length > 0 ||
-      (intakeLocked && Boolean(submittedIntake?.blocks.length)) ||
+    indexOfFirstVisibleUser(rows) >= 0 &&
+    (displayIntakeBlocksResolved.length > 0 ||
       (!intakeLocked && hasIntakeQuestions(intakeParseText)));
 
   useEffect(() => {
-    if (intakeAnchorUserId) return;
-    if (intakeBlocks.length > 0 && lastUserBubble && !isIntakeSubmissionText(lastUserBubble.text)) {
-      setIntakeAnchorUserId(lastUserBubble.id);
-      return;
-    }
-    const fromHistory = findIntakeAnchorUserId(rows);
-    if (fromHistory) setIntakeAnchorUserId(fromHistory);
-  }, [intakeAnchorUserId, intakeBlocks, lastUserBubble, rows]);
+    const anchorId = findIntakeAnchorUserId(rows);
+    if (anchorId) setIntakeAnchorUserId(anchorId);
+    else setIntakeAnchorUserId(null);
+  }, [rows]);
 
   useEffect(() => {
-    if (intakeSubmitted || !rows.length) return;
-    for (let i = rows.length - 1; i >= 0; i--) {
-      const r = rows[i]!;
-      if (String(r.role).toLowerCase() !== "user" || !isIntakeSubmissionText(r.text)) continue;
-      for (let j = i - 1; j >= 0; j--) {
-        const a = rows[j]!;
-        if (String(a.role).toLowerCase() !== "assistant") continue;
-        const blocks = parseQuestionBlocks(extractIntakeOnlyText(a.text));
-        if (!blocks.length) continue;
-        const { selections, custom, followUp } = parseIntakeSubmissionSelections(r.text);
-        setFrozenIntake(blocks);
-        setSubmittedIntake({ blocks, selections, custom, followUp });
-        setIntakeSubmitted(true);
-        if (!intakeAnchorUserId) {
-          for (let k = j - 1; k >= 0; k--) {
-            const u = rows[k]!;
-            if (String(u.role).toLowerCase() === "user" && !isIntakeSubmissionText(u.text)) {
-              setIntakeAnchorUserId(u.id);
-              break;
-            }
-          }
-        }
-        return;
-      }
-      if (/^全部用默认/.test(r.text.trim())) {
-        setIntakeSubmitted(true);
-        return;
-      }
-      break;
+    if (!currentTurnAnchorId) return;
+    setIntakeSelections({});
+    setIntakeCustom({});
+    setIntakeFollowUp({});
+    setIntakeFocusQ(null);
+  }, [currentTurnAnchorId]);
+
+  useEffect(() => {
+    if (turnSubmittedIntake) {
+      setSubmittedIntake(turnSubmittedIntake);
+      setIntakeSubmitted(true);
+      setFrozenIntake(turnSubmittedIntake.blocks);
+      return;
     }
-  }, [rows, intakeSubmitted]);
+    if (!awaitingAgent) {
+      setIntakeSubmitted(false);
+      setSubmittedIntake(null);
+    }
+  }, [turnSubmittedIntake, awaitingAgent]);
 
   const canSubmitIntake = intakeAnswerComplete(
     frozenIntake ?? intakeBlocks,
@@ -1236,18 +1323,10 @@ export default function App() {
     if (ackFlushedThisRunRef.current) return;
     const stream = streamingRef.current.trim();
     if (!stream || isEmptyAssistantPlaceholder(stream) || isPlanMessage(stream)) return;
-    const toolStarted = toolStartedThisRunRef.current;
-    const ok =
-      shouldEarlyFlushAck(stream) || (toolStarted && isAckMessage(stream) && stream.length >= 20);
-    if (!ok) return;
+    if (!shouldEarlyFlushAck(stream)) return;
 
     ackFlushedThisRunRef.current = true;
     ackTextThisRunRef.current = stream;
-    setRows((prev) => {
-      const next = [...prev, { role: "assistant", text: stream, id: `a-ack-${Date.now().toString(36)}` }];
-      rowsRef.current = next;
-      return next;
-    });
     setStreaming("");
     streamingRef.current = "";
     setAckFlushedTick((t) => t + 1);
@@ -1258,6 +1337,10 @@ export default function App() {
   }, [tryEarlyFlushAck]);
 
   const displayRows = useMemo(() => presentChatRows(rows), [rows]);
+
+  /** 用户首条可见消息前：不展示任务进展明细（预热等后台步骤对用户不可见） */
+  const hasVisibleUserMessage = useMemo(() => indexOfFirstVisibleUser(rows) >= 0, [rows]);
+  const visibleToolSteps = hasVisibleUserMessage ? toolSteps : [];
 
   const liveStreamText = useMemo(
     () =>
@@ -1272,6 +1355,18 @@ export default function App() {
   useEffect(() => {
     const el = streamScrollRef.current;
     if (!el) return;
+    const onScroll = () => {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+      streamPinnedToBottomRef.current = distance < 96;
+    };
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const el = streamScrollRef.current;
+    if (!el || !streamPinnedToBottomRef.current) return;
     el.scrollTop = el.scrollHeight;
   }, [rows, streaming, showIntakeCard]);
 
@@ -1279,7 +1374,7 @@ export default function App() {
     const el = processLogRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [toolSteps, awaitingAgent]);
+  }, [toolSteps, awaitingAgent, hasVisibleUserMessage]);
 
   useEffect(() => {
     if (!awaitingAgent) return;
@@ -1401,9 +1496,10 @@ export default function App() {
         const pending = optimisticUserRef.current;
         setRows((prev) => {
           if (loadGen !== historyLoadGen.current) return prev;
-          const sameSession = lastHistorySessionRef.current === sk || lastHistorySessionRef.current === "";
+          const sameSession = lastHistorySessionRef.current === sk;
           const basePrev = sameSession ? prev : [];
           let merged = reconcileChatRows(basePrev, serverRows, { pendingUserText: pending });
+          merged = appendPersistedItineraryImage(sk, merged);
           if (pending && serverRows.length > 0) {
             const lu = lastUserTextInRows(serverRows);
             if (lu != null && lu.trim() === pending.trim()) optimisticUserRef.current = null;
@@ -1423,6 +1519,7 @@ export default function App() {
           if (merged.length > 0) return merged;
           if (opts?.keepOnEmpty && prev.length > 0 && sameSession) {
             merged = reconcileChatRows(prev, [], { pendingUserText: pending });
+            merged = appendPersistedItineraryImage(sk, merged);
             rowsRef.current = merged;
             return merged;
           }
@@ -1455,6 +1552,27 @@ export default function App() {
     stopHistoryPollRef.current = stopHistoryPoll;
   }, [stopHistoryPoll]);
 
+  const maybeApplyHarnessToLastAssistant = useCallback(async () => {
+    const sk = sessionKey.trim();
+    if (!sk) return;
+    const snapshot = rowsRef.current;
+    for (let i = snapshot.length - 1; i >= 0; i--) {
+      const r = snapshot[i]!;
+      if (String(r.role).toLowerCase() !== "assistant") continue;
+      const repaired = await requestHarnessRepair(sk, r.text);
+      if (!repaired || repaired.skipped || repaired.text === r.text) return;
+      setRows((prev) => {
+        const idx = prev.findIndex((x) => x.id === r.id);
+        if (idx < 0) return prev;
+        const next = [...prev];
+        next[idx] = { ...next[idx]!, text: repaired.text };
+        rowsRef.current = next;
+        return next;
+      });
+      return;
+    }
+  }, [sessionKey]);
+
   const flushStreamingIntoRows = useCallback(() => {
     const streamBuf = stripLeadingAssistantPlaceholders(streamingRef.current.trim());
     if (!streamBuf || isEmptyAssistantPlaceholder(streamBuf)) return;
@@ -1468,7 +1586,8 @@ export default function App() {
       return next;
     });
     setStreaming("");
-  }, []);
+    void maybeApplyHarnessToLastAssistant();
+  }, [maybeApplyHarnessToLastAssistant]);
 
   const flushStreamingIntoRowsRef = useRef(flushStreamingIntoRows);
   useEffect(() => {
@@ -1491,11 +1610,13 @@ export default function App() {
   const maybeStartItineraryImage = useCallback(
     (planText: string) => {
       if (!appEnabled) return;
+      if (indexOfFirstVisibleUser(rowsRef.current) < 0) return;
       const text = planText.trim();
       if (!text || isNoiseAssistantBubble(text)) return;
       if (!isCompleteItineraryPlan(text, hadSearchPlacesRef.current)) return;
       const fp = planTextFingerprint(text);
       if (fp === lastImagePlanFpRef.current) return;
+      if (sessionHasPersistedItineraryImage(sessionKey.trim())) return;
 
       cancelItineraryImageGen();
       lastImagePlanFpRef.current = fp;
@@ -1514,16 +1635,18 @@ export default function App() {
             return;
           }
           if (!result.ok || !("image_url" in result)) {
-            setToolSteps((p) =>
-              appendProcessStep(p, `行程图生成失败：${"error" in result ? result.error : "unknown"}`),
+            pushLog(
+              `itinerary-image failed: ${"error" in result ? result.error : "unknown"}`,
             );
             return;
           }
           const md = formatItineraryImageMarkdown(result.image_url);
+          const imgRow: ChatRow = { role: "assistant", text: md, id: `a-img-${Date.now().toString(36)}` };
+          persistItineraryImageRow(sessionKey.trim(), fp, imgRow);
           setRows((prev) => {
             const last = prev[prev.length - 1];
             if (last && String(last.role).toLowerCase() === "assistant" && last.text === md) return prev;
-            const next = [...prev, { role: "assistant", text: md, id: `a-img-${Date.now().toString(36)}` }];
+            const next = [...prev, imgRow];
             rowsRef.current = next;
             return next;
           });
@@ -1533,9 +1656,7 @@ export default function App() {
             setToolSteps((p) => appendProcessStep(p, "行程图已取消（您开始了新对话）"));
             return;
           }
-          setToolSteps((p) =>
-            appendProcessStep(p, `行程图请求失败：${e instanceof Error ? e.message : String(e)}`),
-          );
+          pushLog(`itinerary-image request error: ${e instanceof Error ? e.message : String(e)}`);
         } finally {
           if (itineraryImageJobIdRef.current === jobId) {
             itineraryImageJobIdRef.current = null;
@@ -1545,7 +1666,7 @@ export default function App() {
         }
       })();
     },
-    [appEnabled, cancelItineraryImageGen],
+    [appEnabled, cancelItineraryImageGen, pushLog, sessionKey],
   );
 
   useEffect(() => {
@@ -1558,16 +1679,18 @@ export default function App() {
 
   const tryTriggerItineraryImageFromRows = useCallback(() => {
     if (!appEnabled) return;
+    if (indexOfFirstVisibleUser(rowsRef.current) < 0) return;
     if (streamingRef.current.trim()) return;
     if (imageGenPendingRef.current || itineraryImageJobIdRef.current) return;
     const snapshot = rowsRef.current;
     if (rowsHasItineraryImage(snapshot)) return;
+    if (sessionHasPersistedItineraryImage(sessionKey.trim())) return;
     const planText = findLongestPlanText(snapshot, ackTextThisRunRef.current);
     if (!planText) return;
     const hadSearch = hadSearchPlacesRef.current || historyHadSearchRef.current;
     if (!isCompleteItineraryPlan(planText, hadSearch)) return;
     maybeStartItineraryImageRef.current(planText);
-  }, [appEnabled]);
+  }, [appEnabled, sessionKey]);
 
   useEffect(() => {
     tryTriggerItineraryImageFromRowsRef.current = tryTriggerItineraryImageFromRows;
@@ -1725,6 +1848,7 @@ export default function App() {
           }
         };
         const appendStream = (payload: unknown) => {
+          if (warmupInFlightRef.current) return;
           const piece = extractTextFromChatEvent(payload);
           const think = extractThinkingDelta(payload);
           if (think) {
@@ -1744,20 +1868,26 @@ export default function App() {
           }
         };
         if (evt.event === "chat" || evt.event === "session.message") {
-          noteToolStart(evt.payload);
-          setToolSteps((p) => appendToolTimeline(p, evt, seenToolsThisRunRef.current));
-          if (toolEventUsedSearchPlaces(evt.payload)) {
-            hadSearchPlacesRef.current = true;
+          if (!warmupInFlightRef.current) {
+            noteToolStart(evt.payload);
+            setToolSteps((p) => appendToolTimeline(p, evt, seenToolsThisRunRef.current));
+            if (toolEventUsedSearchPlaces(evt.payload)) {
+              hadSearchPlacesRef.current = true;
+            }
           }
           extractRunId(evt.payload);
           const chatState = getChatEventState(evt.payload);
           if (chatState === "final" || chatState === "aborted" || chatState === "error") {
+            if (warmupInFlightRef.current) {
+              finishWarmupRunRef.current(sessionKey.trim());
+              stopHistoryPollRef.current();
+              void refreshHistoryRef.current({ keepOnEmpty: true });
+              return;
+            }
             flushStreamingIntoRowsRef.current();
             if (chatState === "final") {
               window.setTimeout(() => tryTriggerItineraryImageFromRowsRef.current(), 80);
             }
-            ackFlushedThisRunRef.current = false;
-            ackTextThisRunRef.current = "";
             toolStartedThisRunRef.current = false;
             setAckFlushedTick((t) => t + 1);
             setAwaitingAgent(false);
@@ -1769,10 +1899,21 @@ export default function App() {
           return;
         }
         if (evt.event === "agent") {
-          noteToolStart(evt.payload);
-          setToolSteps((p) => appendToolTimeline(p, evt, seenToolsThisRunRef.current));
-          if (toolEventUsedSearchPlaces(evt.payload)) {
-            hadSearchPlacesRef.current = true;
+          if (!warmupInFlightRef.current) {
+            noteToolStart(evt.payload);
+            setToolSteps((p) => appendToolTimeline(p, evt, seenToolsThisRunRef.current));
+            if (toolEventUsedSearchPlaces(evt.payload)) {
+              hadSearchPlacesRef.current = true;
+            }
+          }
+          if (warmupInFlightRef.current && evt.payload && typeof evt.payload === "object") {
+            const p = evt.payload as Record<string, unknown>;
+            const stream = typeof p.stream === "string" ? p.stream : "";
+            const data = p.data && typeof p.data === "object" ? (p.data as Record<string, unknown>) : null;
+            if (stream === "lifecycle" && data && String(data.phase ?? "") === "end") {
+              finishWarmupRunRef.current(sessionKey.trim());
+              return;
+            }
           }
           appendStream(evt.payload);
           return;
@@ -1964,6 +2105,89 @@ export default function App() {
     [pushLog, sessionKey],
   );
 
+  const finishWarmupRun = useCallback((sk: string) => {
+    if (!warmupInFlightRef.current && !warmupResolveRef.current) return;
+    warmupInFlightRef.current = false;
+    warmupStateRef.current = "done";
+    if (sk) warmupDoneSessions.current.add(sk);
+    setStreaming("");
+    streamingRef.current = "";
+    setToolSteps([]);
+    warmupResolveRef.current?.();
+    warmupResolveRef.current = null;
+    warmupPromiseRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    finishWarmupRunRef.current = finishWarmupRun;
+  }, [finishWarmupRun]);
+
+  const startSessionWarmup = useCallback(async () => {
+    const sk = sessionKey.trim();
+    if (!sk || !appEnabled || !clientRef.current?.connected) return;
+    if (warmupDoneSessions.current.has(sk)) return;
+    if (warmupInFlightRef.current) return;
+    if (indexOfFirstVisibleUser(rowsRef.current) >= 0) {
+      warmupDoneSessions.current.add(sk);
+      warmupStateRef.current = "done";
+      return;
+    }
+    if (
+      !shouldStartWarmup({
+        sessionKey: sk,
+        hasVisibleUserMessage: false,
+        warmupState: warmupStateRef.current,
+      })
+    ) {
+      return;
+    }
+
+    warmupInFlightRef.current = true;
+    warmupStateRef.current = "running";
+    warmupPromiseRef.current = new Promise<void>((resolve) => {
+      warmupResolveRef.current = resolve;
+    });
+
+    const ok = await sendHiddenContextMessage(WARMUP_MESSAGE);
+    if (!ok) {
+      pushLog("warmup: hidden send failed");
+      warmupStateRef.current = "failed";
+      finishWarmupRun(sk);
+      return;
+    }
+
+    window.setTimeout(() => {
+      if (!warmupInFlightRef.current) return;
+      pushLog("warmup: timeout, unblocking user send");
+      warmupStateRef.current = "failed";
+      finishWarmupRun(sk);
+    }, WARMUP_TIMEOUT_MS);
+  }, [appEnabled, finishWarmupRun, pushLog, sendHiddenContextMessage, sessionKey]);
+
+  const ensureWarmupComplete = useCallback(
+    async (timeoutMs = WARMUP_TIMEOUT_MS) => {
+      const sk = sessionKey.trim();
+      if (!sk || warmupDoneSessions.current.has(sk)) return;
+      if (indexOfFirstVisibleUser(rowsRef.current) >= 0) {
+        warmupDoneSessions.current.add(sk);
+        return;
+      }
+      if (warmupStateRef.current === "failed") return;
+      if (warmupStateRef.current === "idle" && !warmupInFlightRef.current) {
+        void startSessionWarmup();
+      }
+      const p = warmupPromiseRef.current;
+      if (!p) return;
+      await Promise.race([p, new Promise<void>((r) => window.setTimeout(r, timeoutMs))]);
+    },
+    [sessionKey, startSessionWarmup],
+  );
+
+  useEffect(() => {
+    startSessionWarmupRef.current = () => void startSessionWarmup();
+    ensureWarmupCompleteRef.current = ensureWarmupComplete;
+  }, [ensureWarmupComplete, startSessionWarmup]);
+
   const injectLocationForSession = useCallback(
     async (userText: string): Promise<boolean> => {
       if (!appEnabled || !resolvedLocation) return false;
@@ -2011,6 +2235,13 @@ export default function App() {
   );
 
   useEffect(() => {
+    if (!connected || !appEnabled || !sessionKey.trim()) return;
+    if (indexOfFirstVisibleUser(rows) >= 0) return;
+    void injectLocationForSession("");
+    void startSessionWarmup();
+  }, [appEnabled, connected, injectLocationForSession, rows, sessionKey, startSessionWarmup]);
+
+  useEffect(() => {
     if (!autoConnect) return;
     if (!appEnabled) return;
     if (autoConnectDone.current) return;
@@ -2029,12 +2260,13 @@ export default function App() {
   }, [connect, gatewayUrl, token, appEnabled]);
 
   const sendMessage = useCallback(
-    async (text: string, opts?: { displayText?: string }) => {
+    async (text: string, opts?: { displayText?: string; hideVisibleUser?: boolean }) => {
       const c = clientRef.current;
       const msg = text.trim();
       const userVisible = (opts?.displayText ?? msg).trim();
       if (!appEnabled || !c?.connected || !msg) return;
       if (isLocationContextMessage(msg)) return;
+      if (isWarmupMessage(msg)) return;
       if (!sessionKey.trim()) {
         setStatus("session key required");
         return;
@@ -2047,6 +2279,7 @@ export default function App() {
       ackTextThisRunRef.current = "";
       toolStartedThisRunRef.current = false;
       setAckFlushedTick((t) => t + 1);
+      await ensureWarmupComplete();
       await ensureLocationInjected(msg);
       const idem = newIdempotencyKey();
       const streamBuf = streamingRef.current.trim();
@@ -2071,7 +2304,9 @@ export default function App() {
       );
       setStatus("sending…");
       optimisticUserRef.current = msg;
-      setRows((r) => [...r, { role: "user", text: userVisible, id: `u-${idem}` }]);
+      if (!opts?.hideVisibleUser) {
+        setRows((r) => [...r, { role: "user", text: userVisible, id: `u-${idem}` }]);
+      }
       try {
         const ack = await c.request("chat.send", {
           sessionKey: sessionKey.trim(),
@@ -2079,6 +2314,7 @@ export default function App() {
           idempotencyKey: idem,
         });
         pushLog(`chat.send ack → ${JSON.stringify(ack)}`);
+        void notifyHarnessUserMessage(sessionKey.trim(), msg);
         setStatus("connected · sent");
         setThreads((prev) => {
           if (!activeThreadId) return prev;
@@ -2099,7 +2335,7 @@ export default function App() {
         setStatus(`chat.send failed: ${formatRpcError(e)}`);
       }
     },
-    [activeThreadId, appEnabled, ensureLocationInjected, pushLog, refreshHistory, sessionKey, startHistoryPoll],
+    [activeThreadId, appEnabled, ensureLocationInjected, ensureWarmupComplete, pushLog, refreshHistory, sessionKey, startHistoryPoll],
   );
 
   const clearIntakeUi = useCallback(() => {
@@ -2134,7 +2370,7 @@ export default function App() {
       }
       return prev;
     });
-    await sendMessage("全部用默认（城市默认坐标、半天、2成人、不忌口、地铁+打车）");
+    await sendMessage("全部用默认（城市默认坐标、半天、2成人、不忌口、地铁+打车）", { hideVisibleUser: true });
   }, [frozenIntake, intakeBlocks, intakeCustom, intakeFollowUp, intakeSelections, rows, sendMessage]);
 
   const submitIntakeChoices = useCallback(async () => {
@@ -2144,7 +2380,6 @@ export default function App() {
     const custom = { ...intakeCustom };
     const followUp = { ...intakeFollowUp };
     const apiText = formatIntakeSubmission(blocks, selections, custom, followUp);
-    const displayText = formatIntakeSubmissionReadable(blocks, selections, custom, followUp);
     setSubmittedIntake({ blocks, selections, custom, followUp });
     setFrozenIntake(blocks);
     setIntakeSubmitted(true);
@@ -2156,7 +2391,7 @@ export default function App() {
       }
       return prev;
     });
-    await sendMessage(apiText, { displayText });
+    await sendMessage(apiText, { hideVisibleUser: true });
   }, [frozenIntake, intakeBlocks, intakeCustom, intakeFollowUp, intakeSelections, rows, sendMessage]);
 
   const applyDraftToIntakeOther = useCallback(
@@ -2232,8 +2467,14 @@ export default function App() {
       setStreaming("");
       setAwaitingAgent(false);
       setToolSteps([]);
+      warmupInFlightRef.current = false;
+      warmupPromiseRef.current = null;
+      warmupResolveRef.current?.();
+      warmupResolveRef.current = null;
+      warmupStateRef.current = "idle";
       clearIntakeUi();
       optimisticUserRef.current = null;
+      rowsRef.current = [];
       setActiveThreadId(threadId);
       localStorage.setItem(ACTIVE_THREAD_LS, threadId);
       localStorage.setItem("gw.session", t.sessionKey);
@@ -2258,10 +2499,10 @@ export default function App() {
     setStreaming("");
     optimisticUserRef.current = null;
     clearIntakeUi();
+    rowsRef.current = [];
     try {
       const newKey = await allocateWebchatSessionKey(c, pushLog, {
         label: `webchat-${getOrCreateDeviceId().slice(0, 24)}-${new Date().toISOString().slice(0, 16)}`,
-        forkFrom: sessionKey,
       });
       const id = "t-" + Date.now().toString(36);
       const nt: ChatThread = { id, sessionKey: newKey, title: "新对话", updatedAt: Date.now() };
@@ -2277,6 +2518,7 @@ export default function App() {
       localStorage.setItem("gw.session", newKey);
       setSessionKey(newKey);
       setRows([]);
+      rowsRef.current = [];
       setStatus("已新建对话");
     } catch (e) {
       pushLog(`createNewThread ${formatRpcError(e)}`);
@@ -2352,8 +2594,8 @@ export default function App() {
   const uiLocked = !appEnabled;
 
   const cardAnchorUserId = useMemo(
-    () => intakeAnchorUserId ?? findIntakeAnchorUserId(rows),
-    [intakeAnchorUserId, rows],
+    () => sessionPlanningIntake?.anchorId ?? intakeAnchorUserId ?? findIntakeAnchorUserId(rows),
+    [intakeAnchorUserId, rows, sessionPlanningIntake],
   );
 
   const intakeCardEl =
@@ -2363,8 +2605,8 @@ export default function App() {
           intro={displayIntakeIntro}
           blocks={intakeCardBlocks}
           selections={cardSelections}
-          custom={intakeLocked && submittedIntake ? submittedIntake.custom : intakeCustom}
-          followUp={intakeLocked && submittedIntake ? submittedIntake.followUp ?? {} : intakeFollowUp}
+          custom={intakeLocked && effectiveSubmittedIntake ? effectiveSubmittedIntake.custom : intakeCustom}
+          followUp={intakeLocked && effectiveSubmittedIntake ? effectiveSubmittedIntake.followUp ?? {} : intakeFollowUp}
           locked={intakeLocked}
           showDefault={/全部用默认/.test(intakeParseText)}
           canSubmit={canSubmitIntake}
@@ -2599,26 +2841,11 @@ export default function App() {
                 cardAnchorUserId === r.id;
               if (placeCardWithUser) intakeCardPlaced = true;
 
-              let bubbleText = r.text;
-              if (
-                rl === "user" &&
-                isIntakeSubmissionText(r.text) &&
-                intakeLocked &&
-                submittedIntake &&
-                r.text.trim().startsWith("选择题答案：")
-              ) {
-                bubbleText = formatIntakeSubmissionReadable(
-                  submittedIntake.blocks,
-                  submittedIntake.selections,
-                  submittedIntake.custom,
-                  submittedIntake.followUp ?? {},
-                );
-              }
               const bubble = (
                 <div key={r.id} className={`bubble role-${rl}`}>
                   <div className="role">{rl}</div>
-                  <MarkdownErrorBoundary text={bubbleText}>
-                    <BubbleMarkdown text={bubbleText} />
+                  <MarkdownErrorBoundary text={r.text}>
+                    <BubbleMarkdown text={r.text} />
                   </MarkdownErrorBoundary>
                 </div>
               );
@@ -2645,7 +2872,13 @@ export default function App() {
           !isRawToolPayloadText(liveStreamText) ? (
             <div className="bubble role-assistant streaming">
               <div className="role">live</div>
-              <StreamingPlainText text={liveStreamText} />
+              <MarkdownErrorBoundary text={liveStreamText}>
+                {shouldStreamMarkdown(liveStreamText) ? (
+                  <StreamingMarkdown text={liveStreamText} />
+                ) : (
+                  <StreamingPlainText text={liveStreamText} />
+                )}
+              </MarkdownErrorBoundary>
             </div>
           ) : null}
         </div>
@@ -2657,12 +2890,12 @@ export default function App() {
                 <p className="process-log-status">网络重连中，请稍候再发送…</p>
               ) : awaitingAgent ? (
                 <p className="process-log-status">处理中（补槽 / 调工具 / 生成方案）…</p>
-              ) : imageGenPending ? (
+              ) : imageGenPending && hasVisibleUserMessage ? (
                 <p className="process-log-status">长文已就绪，正在绘制行程一览图…</p>
-              ) : toolSteps.length === 0 ? (
+              ) : visibleToolSteps.length === 0 ? (
                 <p className="process-log-empty">发送消息后，Agent 补槽、规划与 MCP 工具调用会实时显示在此</p>
               ) : null}
-              {toolSteps.map((s) => (
+              {visibleToolSteps.map((s) => (
                 <div key={s.id} className="process-log-row">
                   <span className="process-log-clock">{s.clock}</span>
                   <span className="process-log-msg">{s.msg}</span>
@@ -2670,7 +2903,7 @@ export default function App() {
               ))}
             </div>
           ) : null}
-          {showIntakeCard && !intakeLocked && displayIntakeBlocks.length > 0 ? (
+          {showIntakeCard && !intakeLocked && displayIntakeBlocksResolved.length > 0 ? (
             <p className="intake-composer-hint">
               请在上方卡片点选后点「确认提交」；确认前可改选，确认后不可修改。
             </p>
