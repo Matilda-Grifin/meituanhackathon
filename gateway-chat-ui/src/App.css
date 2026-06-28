@@ -193,6 +193,57 @@
   margin-bottom: 0.25rem;
 }
 
+/* ── Model selector ── */
+.model-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.model-select {
+  background: #1e1f25;
+  color: #e8eaed;
+  border: 1px solid #3a3b44;
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  min-width: 180px;
+  transition: border-color 0.15s;
+}
+
+.model-select:hover {
+  border-color: #5a5b64;
+}
+
+.model-select:focus {
+  border-color: #6c8cff;
+}
+
+.model-select:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.model-switch-indicator {
+  font-size: 0.85rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.model-switch-msg {
+  font-size: 0.8rem;
+  color: #4caf50;
+  white-space: nowrap;
+}
+
 .app.compact-mode .main-col > .compact-connecting {
   flex-shrink: 0;
 }
@@ -289,8 +340,20 @@ button.danger {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  align-items: flex-start;
   padding: 0.35rem 0.25rem 0.35rem 0;
+}
+
+.bubble-row {
+  display: flex;
+  width: 100%;
+}
+
+.bubble-row-user {
+  justify-content: flex-end;
+}
+
+.bubble-row-assistant {
+  justify-content: flex-start;
 }
 
 .bubble {
@@ -497,7 +560,6 @@ button.danger {
 }
 
 .bubble.role-user {
-  align-self: flex-end;
   max-width: min(88%, 28rem);
   border-color: #355c7d;
   background: #152535;
@@ -505,7 +567,7 @@ button.danger {
 
 .bubble.role-assistant,
 .bubble.role-unknown {
-  align-self: flex-start;
+  max-width: min(92%, 34rem);
 }
 
 .bubble.streaming {
@@ -779,6 +841,17 @@ button.danger {
   line-height: 1.45;
 }
 
+.intake-superseded-hint {
+  margin: 0 0 0.65rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 6px;
+}
+
 .intake-composer-hint {
   margin: 0 0 0.45rem;
   font-size: 0.72rem;
@@ -814,6 +887,20 @@ button.danger {
 .intake-bubble--submitted .intake-pill.selected {
   border-color: #34d399;
   background: #ecfdf5;
+}
+
+/* 口语发送：全部置灰，不高亮任何选项，用户原句只在右侧气泡展示 */
+.intake-bubble--freetext-locked .intake-pill {
+  opacity: 0.55;
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.intake-bubble--freetext-locked .intake-pill.selected {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .intake-bubble-edit-hint {

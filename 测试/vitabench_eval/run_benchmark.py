@@ -42,6 +42,7 @@ def main() -> None:
     ap.add_argument("--skip-agent", action="store_true")
     ap.add_argument("--user-model", default="user")
     ap.add_argument("--judge-model", default="judge")
+    ap.add_argument("--batch", default="", help="batch alias for usage dashboard (e.g. qwen-harness10)")
     args = ap.parse_args()
 
     load_repo_env()
@@ -71,6 +72,7 @@ def main() -> None:
         judge_model=args.judge_model,
         user_temperature=(llm.get("user_simulator") or {}).get("temperature"),
         judge_temperature=(llm.get("evaluator") or {}).get("temperature"),
+        batch=args.batch,
     )
     payload = {
         "run_at": datetime.now(timezone.utc).isoformat(),

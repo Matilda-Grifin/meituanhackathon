@@ -7,7 +7,10 @@ from typing import Any
 from vitabench_eval.agent_bridge import format_environment_block, run_agent_turn
 from vitabench_eval.env_runner import McpLogTracker, count_mcp_errors, entries_to_tool_messages
 from vitabench_eval.harness_bridge import apply_harness_post_output, prepare_harness_turn
+from vitabench_eval.llm_client import merge_usage
 from vitabench_eval.user_simulator import STOP, UserSimulator
+
+DEFAULT_AGENT_MODEL = "qwen3.6-plus"
 
 EARLY_ZERO = frozenset({"max_steps", "too_many_errors", "agent_error", "invalid_agent_message"})
 
@@ -24,6 +27,7 @@ def run_simulation(
     user_model: str = "user",
     user_temperature: float | None = None,
     judge_temperature: float | None = None,
+    batch: str = "",
 ) -> dict[str, Any]:
     task_id = task.get("id") or "unknown"
     session_id = f"{session_prefix}-{task_id}-{uuid.uuid4().hex[:8]}"
@@ -32,10 +36,17 @@ def run_simulation(
         task,
         model=user_model,
         temperature=user_temperature if user_temperature is not None else 0.6,
+        session_id=session_id,
+        batch=batch,
     )
     mcp_tracker = McpLogTracker()
     trajectory: list[dict] = []
     harness_turns: list[dict] = []
+    token_usage: dict[str, dict] = {
+        "agent": {"input": 0, "output": 0, "total": 0, "reasoning": 0, "cacheRead": 0, "runs": 0, "model": DEFAULT_AGENT_MODEL},
+        "user_sim": {"input": 0, "output": 0, "total": 0, "reasoning": 0, "cacheRead": 0, "runs": 0},
+        "judge": {"input": 0, "output": 0, "total": 0, "reasoning": 0, "cacheRead": 0, "runs": 0},
+    }
     termination = "unknown"
     num_errors = 0
     step = 0
@@ -103,6 +114,15 @@ def run_simulation(
                 "time_to_first_progress_ms"
             )
 
+        agent_usage = agent_out.get("usage")
+        if agent_usage:
+            merge_usage(token_usage["agent"], agent_usage)
+            token_usage["agent"]["runs"] = int(token_usage["agent"].get("runs") or 0) + 1
+            meta = agent_out.get("raw_meta") or {}
+            model_id = meta.get("modelId") or meta.get("model")
+            if model_id:
+                token_usage["agent"]["model"] = model_id
+
         mcp_entries = mcp_tracker.drain_new_entries()
         harness = apply_harness_post_output(session_id, asst_text_raw)
         asst_text = harness.get("text") or asst_text_raw
@@ -166,7 +186,20 @@ def run_simulation(
         from vitabench_eval.trajectory_evaluator import evaluate_trajectory
 
         jtemp = judge_temperature if judge_temperature is not None else 0.1
-        reward_info = evaluate_trajectory(task, trajectory, model=judge_model, temperature=jtemp)
+        reward_info = evaluate_trajectory(
+            task,
+            trajectory,
+            model=judge_model,
+            temperature=jtemp,
+            session_id=session_id,
+            batch=batch,
+        )
+
+    if user_sim.usage_total.get("total") or user_sim.usage_total.get("runs"):
+        token_usage["user_sim"] = {**user_sim.usage_total, "model": user_sim.usage_model or user_model}
+    judge_u = (reward_info or {}).get("usage") or {}
+    if judge_u.get("total") or judge_u.get("runs"):
+        token_usage["judge"] = {**judge_u}
 
     from vitabench_eval.metrics import score_first_response
 
@@ -190,4 +223,5 @@ def run_simulation(
         },
         "reward_info": reward_info,
         "first_response": fr,
+        "token_usage": {k: v for k, v in token_usage.items() if v.get("total") or v.get("runs")},
     }

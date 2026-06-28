@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>现在就出发 · 费用看板</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="header">
+    <div>
+      <h1>现在就出发 · 费用看板</h1>
+      <p class="sub" id="meta">加载中…</p>
+    </div>
+    <div class="controls">
+      <div class="mode-tabs" role="tablist">
+        <button type="button" class="mode-tab active" data-mode="online" id="tabOnline">线上真实费用</button>
+        <button type="button" class="mode-tab" data-mode="eval" id="tabEval">测试看板</button>
+      </div>
+      <label>维度
+        <select id="period">
+          <option value="daily">按日</option>
+          <option value="weekly">按周</option>
+          <option value="monthly">按月</option>
+        </select>
+      </label>
+      <label>指标
+        <select id="metric">
+          <option value="tokensWan">Token（万）</option>
+          <option value="cost">费用（元）</option>
+        </select>
+      </label>
+      <button type="button" id="refresh">立即刷新</button>
+    </div>
+  </header>
+
+  <section class="cards" id="summaryCards"></section>
+
+  <section class="panel panel-primary">
+    <h2 id="usageCostTitle">用量与费用明细</h2>
+    <div class="table-wrap">
+      <table id="usageCostTable">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="evalBatchPanel" hidden>
+    <h2>Batch / 任务明细（测试）</h2>
+    <div class="table-wrap">
+      <table id="batchTable">
+        <thead>
+          <tr>
+            <th>Batch</th>
+            <th>任务数</th>
+            <th>Token（万）</th>
+            <th>费用（元）</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="table-wrap" style="margin-top:1rem">
+      <table id="taskTable">
+        <thead>
+          <tr>
+            <th>Batch</th>
+            <th>Task</th>
+            <th>结束方式</th>
+            <th>Token（万）</th>
+            <th>费用（元）</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>文字模型明细</h2>
+    <div class="table-wrap">
+      <table id="modelTable">
+        <thead>
+          <tr>
+            <th>模型</th>
+            <th>Provider</th>
+            <th>Token（万）</th>
+            <th>输入</th>
+            <th>输出</th>
+            <th>调用次数</th>
+            <th>费用（元）</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="mcpPanel">
+    <h2>MCP 工具明细</h2>
+    <div class="table-wrap">
+      <table id="mcpTable">
+        <thead>
+          <tr>
+            <th>工具</th>
+            <th>调用次数</th>
+            <th>费用（元）</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="rolePanel" hidden>
+    <h2>测评角色分项（Agent / 用户模拟 / 裁判）</h2>
+    <div class="table-wrap">
+      <table id="roleTable">
+        <thead>
+          <tr>
+            <th>角色</th>
+            <th>Token（万）</th>
+            <th>调用次数</th>
+            <th>费用（元）</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="charts two-col">
+    <div class="panel">
+      <h2 id="barTitle">每日 Token 用量（万）</h2>
+      <canvas id="barChart"></canvas>
+    </div>
+    <div class="panel">
+      <h2 id="pieTitle">类型占比</h2>
+      <canvas id="pieChart"></canvas>
+    </div>
+  </section>
+
+  <footer class="notes" id="notes"></footer>
+  <script src="chart.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

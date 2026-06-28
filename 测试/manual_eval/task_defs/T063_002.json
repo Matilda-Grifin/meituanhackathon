@@ -1,0 +1,130 @@
+{
+  "id": "T063_002",
+  "domain": "travel_local",
+  "difficulty": "easy",
+  "trip_mode": "nearby",
+  "requires_dining": true,
+  "message_history": [],
+  "environment": {
+    "time": "2026-06-14 09:00:00",
+    "timezone": "Asia/Shanghai",
+    "user_id": "u_mock_002",
+    "location": [
+      {
+        "label": "home",
+        "address": "北京市朝阳区望京SOHO T3附近（虚构）",
+        "longitude": 116.480983,
+        "latitude": 39.996794
+      },
+      {
+        "label": "work",
+        "address": "北京市海淀区中关村大街27号中关村大厦附近（虚构）",
+        "longitude": 116.310905,
+        "latitude": 39.992806
+      }
+    ],
+    "user_historical_behaviors": {
+      "用户id": "u_mock_002",
+      "昵称": "老周",
+      "职业": "销售",
+      "性别": "男",
+      "年龄段": "39~43",
+      "常住地": "北京",
+      "家庭住址": "北京市朝阳区望京SOHO T3附近（虚构）",
+      "工作地址": "北京市海淀区中关村大街27号中关村大厦附近（虚构）",
+      "饮食禁忌": "无",
+      "口味偏好": [
+        "火锅",
+        "烤鸭",
+        "亲子友好"
+      ],
+      "消费层级": "质价比",
+      "价格敏感度": "中",
+      "出行半径偏好_km": 25,
+      "dislike_long_queues": false,
+      "常消费餐饮价格带": "人均100~200元",
+      "历史出行摘要": "带娃出行多选有儿童设施商场内餐饮，景点偏好互动类科技馆。"
+    },
+    "orders": {
+      "local_life_recent": [
+        {
+          "order_id": "LL202600201",
+          "order_type": "instore_dining",
+          "status": "completed",
+          "create_time": "2026-05-10 12:00:00",
+          "city": "北京",
+          "store_name": "某火锅店（虚构）",
+          "category": "火锅",
+          "party_size": 2,
+          "total_price": 128,
+          "note": "演示订单"
+        },
+        {
+          "order_id": "LL202600202",
+          "order_type": "culture_ticket",
+          "status": "completed",
+          "create_time": "2026-05-21 12:00:00",
+          "city": "北京",
+          "venue_name": "北京某文化场馆（虚构）",
+          "category": "展览",
+          "party_size": 2,
+          "total_price": 98,
+          "note": "双人票"
+        },
+        {
+          "order_id": "LL202600203",
+          "order_type": "delivery",
+          "status": "completed",
+          "create_time": "2026-05-04 12:00:00",
+          "city": "北京",
+          "store_name": "某亲子友好店（虚构）",
+          "category": "亲子友好",
+          "party_size": 1,
+          "total_price": 76,
+          "note": "演示订单"
+        }
+      ]
+    }
+  },
+  "user_scenario": {
+    "user_profile": {
+      "用户id": "u_mock_002",
+      "昵称": "老周",
+      "年龄": 41,
+      "性别": "男",
+      "常住地": "北京",
+      "职业": "销售",
+      "家庭情况": "夫妻带8岁儿子共3人",
+      "同行人员": "夫妻带8岁儿子共3人",
+      "家庭住址": "北京市朝阳区望京SOHO T3附近（虚构）",
+      "饮食禁忌": "无",
+      "性格": "带娃务实，重视安全与儿童设施"
+    }
+  },
+  "instructions": "今天是2026年6月14日，夫妻带8岁儿子共3人在家附近玩半日（大约4~6小时），半日内包含亲子友好午餐，人均100~200元。主要想互动科技馆，单程打车40分钟以内。Agent 须用工具查当天天气，用高德搜真实 POI 并给出分时段动线（含交通建议）。方案须含娱乐/文化类与餐饮类 POI，至少3个可执行锚点（含正餐）。首次只说：「带娃在家附近玩半天，别太折腾」；Agent 反问后再补充人数、预算、忌口、出门时间。若 Agent 未查天气/未搜 POI/方案不符，要追问改方案；满意后表示可以按计划走。",
+  "evaluation_criteria": {
+    "expected_states": [
+      {
+        "state_rubrics": [
+          "Agent 须调用天气工具查询北京在2026-06-14（或当次出行时段）的天气，并在方案中体现是否影响出行",
+          "Agent 须调用 POI 搜索工具，方案中引用的 POI 来自工具返回（含名称或可核对信息），不得纯编造",
+          "方案须同时包含玩乐/文化类与餐饮类 POI，至少3个可执行锚点（含正餐）",
+          "餐饮须符合人均100~200元预算",
+          "动线须从用户居住区域出发的周边范围，单程打车40分钟以内",
+          "须给出分时段安排及点间交通或路程依据（路线工具或明确分钟数）"
+        ]
+      }
+    ],
+    "overall_rubrics": [
+      "最终方案须为可照着执行的半日行程，与「夫妻带8岁儿子共3人、互动科技馆」目标一致",
+      "若 Agent 未完成关键约束即声称结束，相关 rubric 不应判为满足"
+    ]
+  },
+  "_meta": {
+    "purpose": "6.3 测评 Task；虚构用户与订单",
+    "seed_user": "meituan-lifecare-agent/workspace/mock/user_and_reviews.seed.json#u_mock_002",
+    "scenario_label": "北京亲子半日_科技馆午饭",
+    "agent_visible_note": "Agent 仅可见 environment 摘要 + 对话；不可见 instructions 全文",
+    "created_at": "2026-06-03"
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "id": "T063_034",
+  "domain": "travel_local",
+  "difficulty": "medium",
+  "trip_mode": "city",
+  "requires_dining": true,
+  "message_history": [],
+  "environment": {
+    "time": "2026-06-30 09:00:00",
+    "timezone": "Asia/Shanghai",
+    "user_id": "u_mock_004",
+    "location": [
+      {
+        "label": "home",
+        "address": "杭州市西湖区文三路508号天苑大厦附近（虚构）",
+        "longitude": 120.130396,
+        "latitude": 30.274084
+      },
+      {
+        "label": "work",
+        "address": "杭州市滨江区江南大道388号（虚构）",
+        "longitude": 120.211816,
+        "latitude": 30.208415
+      }
+    ],
+    "user_historical_behaviors": {
+      "用户id": "u_mock_004",
+      "昵称": "Momo",
+      "职业": "产品经理",
+      "性别": "女",
+      "年龄段": "30~34",
+      "常住地": "杭州",
+      "家庭住址": "杭州市西湖区文三路508号天苑大厦附近（虚构）",
+      "工作地址": "杭州市滨江区江南大道388号（虚构）",
+      "饮食禁忌": "低糖",
+      "口味偏好": [
+        "创意菜",
+        "展览",
+        "独立书店"
+      ],
+      "消费层级": "品质",
+      "价格敏感度": "低",
+      "出行半径偏好_km": 15,
+      "dislike_long_queues": true,
+      "常消费餐饮价格带": "人均150~300元",
+      "历史出行摘要": "重视环境与出片，愿为设计好的空间付溢价，讨厌嘈杂大排档。"
+    },
+    "orders": {
+      "local_life_recent": [
+        {
+          "order_id": "LL202600401",
+          "order_type": "instore_dining",
+          "status": "completed",
+          "create_time": "2026-05-10 12:00:00",
+          "city": "杭州",
+          "store_name": "某创意菜店（虚构）",
+          "category": "创意菜",
+          "party_size": 2,
+          "total_price": 128,
+          "note": "演示订单"
+        },
+        {
+          "order_id": "LL202600402",
+          "order_type": "culture_ticket",
+          "status": "completed",
+          "create_time": "2026-05-21 12:00:00",
+          "city": "杭州",
+          "venue_name": "杭州某文化场馆（虚构）",
+          "category": "展览",
+          "party_size": 2,
+          "total_price": 98,
+          "note": "双人票"
+        },
+        {
+          "order_id": "LL202600403",
+          "order_type": "delivery",
+          "status": "completed",
+          "create_time": "2026-05-04 12:00:00",
+          "city": "杭州",
+          "store_name": "某独立书店店（虚构）",
+          "category": "独立书店",
+          "party_size": 1,
+          "total_price": 76,
+          "note": "演示订单"
+        }
+      ]
+    }
+  },
+  "user_scenario": {
+    "user_profile": {
+      "用户id": "u_mock_004",
+      "昵称": "Momo",
+      "年龄": 32,
+      "性别": "女",
+      "常住地": "杭州",
+      "职业": "产品经理",
+      "家庭情况": "独居",
+      "同行人员": "独自1人",
+      "家庭住址": "杭州市西湖区文三路508号天苑大厦附近（虚构）",
+      "饮食禁忌": "低糖",
+      "性格": "重视环境与出片，讨厌嘈杂"
+    }
+  },
+  "instructions": "今天是2026年6月30日，独自1人在杭州城里玩一日（大约8~10小时），一日内包含低糖创意菜，人均150~300元，饮食要符合低糖。主要想西湖+展览，可跨区但须在同一城市内。Agent 须用工具查当天天气，用高德搜真实 POI 并给出分时段动线（含交通建议）。方案须含娱乐/文化类与餐饮类 POI，至少3个可执行锚点（含正餐）。首次只说：「想在杭州城里玩一天，要安静出片」；Agent 反问后再补充人数、预算、忌口、出门时间。若 Agent 未查天气/未搜 POI/方案不符，要追问改方案；满意后表示可以按计划走。",
+  "evaluation_criteria": {
+    "expected_states": [
+      {
+        "state_rubrics": [
+          "Agent 须调用天气工具查询杭州在2026-06-30（或当次出行时段）的天气，并在方案中体现是否影响出行",
+          "Agent 须调用 POI 搜索工具，方案中引用的 POI 来自工具返回（含名称或可核对信息），不得纯编造",
+          "方案须同时包含玩乐/文化类与餐饮类 POI，至少3个可执行锚点（含正餐）",
+          "餐饮须体现用户饮食要符合低糖及人均150~300元约束",
+          "动线须覆盖杭州城市内跨区玩法，POI 均在该城市",
+          "须给出分时段安排及点间交通或路程依据（路线工具或明确分钟数）"
+        ]
+      }
+    ],
+    "overall_rubrics": [
+      "最终方案须为可照着执行的一日行程，与「独自1人、西湖+展览」目标一致",
+      "若 Agent 未完成关键约束即声称结束，相关 rubric 不应判为满足"
+    ]
+  },
+  "_meta": {
+    "purpose": "6.3 测评 Task；虚构用户与订单",
+    "seed_user": "meituan-lifecare-agent/workspace/mock/user_and_reviews.seed.json#u_mock_004",
+    "scenario_label": "杭州西湖一日",
+    "agent_visible_note": "Agent 仅可见 environment 摘要 + 对话；不可见 instructions 全文",
+    "created_at": "2026-06-03"
+  }
+}

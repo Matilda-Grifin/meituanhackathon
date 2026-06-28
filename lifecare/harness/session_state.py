@@ -64,10 +64,13 @@ def _default_state() -> dict[str, Any]:
         "planning_intent": False,
         "slots": Slots().to_dict(),
         "has_full_plan": False,
+        "intake_consumed": False,
+        "intake_mode": None,
         "tools_degraded": False,
         "search_degraded": False,
         "weather_degraded": False,
         "consecutive_tool_failures": 0,
+        "turn_seq": 0,
         "tools_called": [],
         "user_messages": [],
         "last_user_message": "",
@@ -105,7 +108,7 @@ def resolve_stage(state: dict[str, Any], policy: dict[str, Any]) -> str:
     blob = "\n".join(msgs)
     has_plan = bool(state.get("has_full_plan"))
     planning_intent = detect_planning_intent(blob) or (has_plan and not detect_light_weather(last_user, blob))
-    if slots.get("ready") and slots.get("intake_submitted"):
+    if slots.get("ready") and (slots.get("intake_submitted") or slots.get("intake_consumed")):
         planning_intent = True
     state["planning_intent"] = planning_intent
 
@@ -136,17 +139,27 @@ def resolve_stage(state: dict[str, Any], policy: dict[str, Any]) -> str:
     return "planning"
 
 
-def on_user_message(session_key: str, message: str) -> dict[str, Any]:
+def on_user_message(session_key: str, message: str, *, intake_skipped: bool = False) -> dict[str, Any]:
     state = load_state(session_key)
     msgs = list(state.get("user_messages") or [])
     msg = (message or "").strip()
     if msg and not msg.startswith("[位置上下文]"):
         if not msgs or msgs[-1] != msg:
             msgs.append(msg)
+        # 每条真实用户消息开启新一轮：工具预算按轮计（追问改方案能重新搜点），
+        # 而非整段会话累计（否则第 3~4 轮搜索被 4 次/会话的上限卡死，丢 POI/配图）。
+        state["turn_seq"] = int(state.get("turn_seq") or 0) + 1
     state["user_messages"] = msgs[-30:]
     state["last_user_message"] = msg
     slots = parse_slots_from_messages(msgs)
+    if intake_skipped and not slots.intake_submitted:
+        slots.intake_consumed = True
+        slots.intake_mode = "skipped_freetext"
+        if detect_planning_intent("\n".join(msgs)):
+            slots.ready = True
     state["slots"] = slots.to_dict()
+    state["intake_consumed"] = bool(slots.intake_consumed)
+    state["intake_mode"] = slots.intake_mode
     set_active_session(session_key)
     from lifecare.harness.policy_loader import load_policy
 
@@ -190,9 +203,9 @@ def record_tool_call(
             if isinstance(data, dict):
                 ok = data.get("ok", True) is not False and not data.get("error")
                 err = data.get("error")
-                if err and "CUQPS" in str(err).upper():
-                    state["search_degraded"] = True
-                    state["tools_degraded"] = True
+                # CUQPS 是高德瞬时限流：err 已使 ok=False，按「该工具失败」走下方计数/恢复，
+                # 不再因任意一次工具限流就立刻全局 search/tools degraded（曾导致一次 plan_route
+                # 限流毒化整段会话、后续轮无 POI 链接与配图）。
         except json.JSONDecodeError:
             ok = True
         empty_or_failed = _is_empty_or_failed(result)
@@ -206,11 +219,13 @@ def record_tool_call(
                     "name": p.name,
                     "amap_place_url": p.amap_place_url,
                     "poi_type": p.poi_type,
+                    "photo_urls": p.photo_urls,
                 }
             )
 
     entry = {
         "tool": tool,
+        "turn_seq": int(state.get("turn_seq") or 0),
         "ok": ok,
         "error": err,
         "blocked": blocked,
@@ -227,14 +242,23 @@ def record_tool_call(
     if not ok and not blocked:
         fails = int(state.get("consecutive_tool_failures") or 0) + 1
         state["consecutive_tool_failures"] = fails
-        if fails >= 2:
-            state["tools_degraded"] = True
+        # 单工具失败只标记其专属 degraded；tools_degraded 需「连续」失败才升级，
+        # 避免单次瞬时限流（尤其是 plan_route）就把整段会话判为降级。
         if "get_weather" in (tool or ""):
             state["weather_degraded"] = True
         if "search_places" in (tool or ""):
             state["search_degraded"] = True
+        if fails >= 2:
+            state["tools_degraded"] = True
     elif ok and not empty_or_failed:
+        # 工具恢复成功：清掉对应 degraded，避免一次瞬时失败永久毒化后续多轮。
         state["consecutive_tool_failures"] = 0
+        if "search_places" in (tool or ""):
+            state["search_degraded"] = False
+        if "get_weather" in (tool or ""):
+            state["weather_degraded"] = False
+        if not state.get("search_degraded") and not state.get("weather_degraded"):
+            state["tools_degraded"] = False
 
     save_state(state)
     return state

@@ -32,6 +32,16 @@ export function isHiddenProcessStepMsg(msg: string): boolean {
   return false;
 }
 
+/** A 阶段（补槽未提交）：展示带时间戳的高层进展（含 read），隐藏 lifecare 主工具行 */
+export function filterIntakePhaseToolSteps(steps: ProcessStep[]): ProcessStep[] {
+  return steps.filter((s) => {
+    const cat = lifecareProgressCategory(s.msg, "msg");
+    if (cat === "weather" || cat === "search" || cat === "route") return false;
+    if (/^调用工具：.*(?:weather|search_places|search_poi|plan_route)/i.test(s.msg)) return false;
+    return true;
+  });
+}
+
 export function appendProcessStep(prev: ProcessStep[], msg: string): ProcessStep[] {
   const line = msg.trim();
   if (!line || isHiddenProcessStepMsg(line)) return prev;

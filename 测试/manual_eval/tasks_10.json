@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "description": "人工评测 10 Tasks · 玩法标签不含城市；浏览器定位实测见 docs/6.3测评/人工评测_10任务集_浏览器定位版.md",
+  "tasks": [
+    {"task_id": "T063_002", "file": "task_defs/T063_002.json", "label": "亲子半日·科技馆", "difficulty": "easy", "rubric_count": 8},
+    {"task_id": "T063_009", "file": "task_defs/T063_009.json", "label": "朋友·小吃半日", "difficulty": "easy", "rubric_count": 8},
+    {"task_id": "T063_012", "file": "task_defs/T063_012.json", "label": "独自·历史街区半日", "difficulty": "easy", "rubric_count": 8},
+    {"task_id": "T063_017", "file": "task_defs/T063_017.json", "label": "独自·书店展览半日", "difficulty": "medium", "rubric_count": 8},
+    {"task_id": "T063_020", "file": "task_defs/T063_020.json", "label": "闺蜜·城里跨区一日", "difficulty": "medium", "rubric_count": 8},
+    {"task_id": "T063_022", "file": "task_defs/T063_022.json", "label": "学生·Livehouse一日", "difficulty": "medium", "rubric_count": 8},
+    {"task_id": "T063_034", "file": "task_defs/T063_034.json", "label": "独自·湖景展览一日", "difficulty": "medium", "rubric_count": 8},
+    {"task_id": "T063_029", "file": "task_defs/T063_029.json", "label": "夫妻·民族风情半日", "difficulty": "medium", "rubric_count": 8},
+    {"task_id": "T063_041", "file": "task_defs/T063_041.json", "label": "独自·赶高铁半日", "difficulty": "hard", "rubric_count": 9},
+    {"task_id": "T063_048", "file": "task_defs/T063_048.json", "label": "老年夫妻·无障碍半日", "difficulty": "hard", "rubric_count": 9}
+  ]
+}

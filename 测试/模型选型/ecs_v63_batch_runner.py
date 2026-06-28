@@ -63,6 +63,7 @@ def _run_one(
     thinking: str,
     dry_run_eval: bool,
     force: bool = False,
+    batch: str = "",
 ) -> dict:
     run_file = out_dir / f"{task_id}_run.json"
     if force:
@@ -88,6 +89,8 @@ def _run_one(
         "420",
         "--out",
         str(run_file),
+        "--batch",
+        batch,
     ]
     if dry_run_eval:
         cmd.append("--dry-run-eval")
@@ -185,7 +188,12 @@ def main() -> None:
         print(f"[{i}/{len(task_ids)}] running {tid}{' (retry)' if force else ''}...", flush=True)
         try:
             row = _run_one(
-                tid, out_dir, thinking=args.thinking, dry_run_eval=args.dry_run_eval, force=force
+                tid,
+                out_dir,
+                thinking=args.thinking,
+                dry_run_eval=args.dry_run_eval,
+                force=force,
+                batch=args.model_alias,
             )
         except Exception as e:
             row = {"task_id": tid, "ok": False, "error": f"{type(e).__name__}: {e}"}

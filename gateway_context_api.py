@@ -128,9 +128,69 @@ def api_itinerary_image_cancel(body: ItineraryImageCancelIn) -> dict:
     return {"ok": True, "cancelled": cancel_job(body.job_id)}
 
 
+# ---------------------------------------------------------------------------
+# Model switch API
+# ---------------------------------------------------------------------------
+import subprocess as _sp  # noqa: E402
+
+MODEL_SWITCH_SCRIPT = str(ROOT / "gateway-chat-ui" / "scripts" / "ecs_switch_model_v2.py")
+
+AVAILABLE_MODELS = [
+    {"id": "doubao-seed-2.0-code",   "label": "豆包 Seed 2.0 Code"},
+    {"id": "doubao-seed-2.0-pro",    "label": "豆包 Seed 2.0 Pro"},
+    {"id": "doubao-seed-2.0-lite",   "label": "豆包 Seed 2.0 Lite"},
+    {"id": "doubao-seed-code",       "label": "豆包 Seed Code"},
+    {"id": "minimax-m2.7",           "label": "MiniMax M2.7"},
+    {"id": "minimax-m3",             "label": "MiniMax M3"},
+    {"id": "glm-4.7",                "label": "GLM 4.7"},
+    {"id": "deepseek-v4-flash",      "label": "DeepSeek V4 Flash"},
+    {"id": "deepseek-v4-pro",        "label": "DeepSeek V4 Pro"},
+    {"id": "kimi-k2.6",              "label": "Kimi K2.6"},
+    {"id": "kimi-k2.7-code",         "label": "Kimi K2.7 Code"},
+]
+
+# Track current model (in-memory, resets on restart)
+_current_model_id: str = "doubao-seed-2.0-code"
+
+
+class SwitchModelIn(BaseModel):
+    model_id: str = Field(..., min_length=1, max_length=80)
+
+
+@app.get("/api/models")
+def api_list_models() -> dict:
+    return {"ok": True, "models": AVAILABLE_MODELS, "current": _current_model_id}
+
+
+@app.post("/api/switch-model")
+def api_switch_model(body: SwitchModelIn) -> dict:
+    global _current_model_id
+    model_id = body.model_id.strip()
+    valid_ids = {m["id"] for m in AVAILABLE_MODELS}
+    if model_id not in valid_ids:
+        raise HTTPException(400, f"Unknown model: {model_id}. Available: {', '.join(sorted(valid_ids))}")
+
+    try:
+        result = _sp.run(
+            ["python3", MODEL_SWITCH_SCRIPT, model_id],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            raise HTTPException(500, f"Switch script failed: {result.stderr or result.stdout}")
+        _current_model_id = model_id
+        return {"ok": True, "model_id": model_id, "output": result.stdout.strip()}
+    except _sp.TimeoutExpired:
+        raise HTTPException(500, "Model switch timed out")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, str(e)) from e
+
+
 class HarnessUserMessageIn(BaseModel):
     session_key: str = Field(..., min_length=1, max_length=200)
     message: str = Field(..., min_length=1, max_length=8000)
+    intake_skipped: bool = False
 
 
 class HarnessValidateIn(BaseModel):
@@ -141,7 +201,11 @@ class HarnessValidateIn(BaseModel):
 
 @app.post("/api/harness/on-user-message")
 def api_harness_on_user_message(body: HarnessUserMessageIn) -> dict:
-    state = on_user_message(body.session_key.strip(), body.message)
+    state = on_user_message(
+        body.session_key.strip(),
+        body.message,
+        intake_skipped=body.intake_skipped,
+    )
     return {
         "ok": True,
         "session_key": state.get("session_key"),
@@ -173,3 +237,123 @@ def api_harness_state(session_key: str) -> dict:
         raise HTTPException(400, "session_key required")
     st = load_state(session_key.strip())
     return {"ok": True, "state": st}
+
+
+# ---------------------------------------------------------------------------
+# Eval manual test log — 前端人工评测 10 Tasks 结构化日志
+# ---------------------------------------------------------------------------
+import json as _json  # noqa: E402
+from datetime import datetime as _dt, timezone as _tz  # noqa: E402
+
+EVAL_LOG_DIR = ROOT / "测试" / "eval_logs"
+EVAL_LOG_DIR.mkdir(parents=True, exist_ok=True)
+SESSIONS_DIR = Path.home() / ".openclaw" / "agents" / "main" / "sessions"
+
+
+class EvalLogIn(BaseModel):
+    """兼容旧版 turn 时序格式"""
+    sessionKey: str = Field(..., min_length=1, max_length=200)
+    user: dict = Field(...)
+    assistant: dict = Field(...)
+    recordedAt: int = Field(..., ge=0)
+
+
+class EvalEventIn(BaseModel):
+    """统一评测事件（turn / intake / 工具进展 / 生图 / 会话元数据）"""
+    event: str = Field(..., min_length=1, max_length=64)
+    sessionKey: str = Field(..., min_length=1, max_length=200)
+    recordedAt: int = Field(..., ge=0)
+    taskId: str | None = Field(default=None, max_length=32)
+    threadTitle: str | None = Field(default=None, max_length=200)
+    turnIndex: int | None = Field(default=None, ge=0)
+    modelId: str | None = Field(default=None, max_length=80)
+    deviceId: str | None = Field(default=None, max_length=80)
+    testerLabel: str | None = Field(default=None, max_length=64)
+    payload: dict = Field(default_factory=dict)
+
+
+def _eval_log_path(date_str: str | None = None) -> Path:
+    ds = date_str or _dt.now(_tz.utc).strftime("%Y-%m-%d")
+    return EVAL_LOG_DIR / f"eval_manual_{ds}.jsonl"
+
+
+def _append_eval_line(entry: dict) -> Path:
+    entry.setdefault("serverTime", _dt.now(_tz.utc).isoformat())
+    log_file = _eval_log_path()
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(_json.dumps(entry, ensure_ascii=False) + "\n")
+    return log_file
+
+
+@app.post("/api/eval/log")
+def api_eval_log(req: EvalLogIn) -> dict:
+    """接收前端 turn 时序（兼容旧格式，写入 eval_manual_*.jsonl）"""
+    log_entry = {
+        "event": "turn_complete",
+        "sessionKey": req.sessionKey,
+        "user": req.user,
+        "assistant": req.assistant,
+        "recordedAt": req.recordedAt,
+    }
+    log_file = _append_eval_line(log_entry)
+    return {"ok": True, "file": str(log_file.name)}
+
+
+@app.post("/api/eval/event")
+def api_eval_event(req: EvalEventIn) -> dict:
+    """接收结构化评测事件"""
+    log_entry = {
+        "event": req.event.strip(),
+        "sessionKey": req.sessionKey.strip(),
+        "recordedAt": req.recordedAt,
+        "taskId": (req.taskId or "").strip() or None,
+        "threadTitle": (req.threadTitle or "").strip() or None,
+        "turnIndex": req.turnIndex,
+        "modelId": (req.modelId or "").strip() or None,
+        "deviceId": (req.deviceId or "").strip() or None,
+        "testerLabel": (req.testerLabel or "").strip() or None,
+        "payload": req.payload or {},
+    }
+    log_file = _append_eval_line(log_entry)
+    return {"ok": True, "file": str(log_file.name), "event": log_entry["event"]}
+
+
+@app.get("/api/eval/logs")
+def api_eval_logs(date: str | None = None, limit: int = 200) -> dict:
+    """列出当日评测日志（最近 limit 条）"""
+    log_file = _eval_log_path(date)
+    if not log_file.is_file():
+        return {"ok": True, "file": log_file.name, "entries": [], "count": 0}
+    lines = log_file.read_text(encoding="utf-8").strip().splitlines()
+    tail = lines[-max(1, min(limit, 2000)) :]
+    entries = []
+    for line in tail:
+        try:
+            entries.append(_json.loads(line))
+        except _json.JSONDecodeError:
+            continue
+    return {"ok": True, "file": log_file.name, "count": len(lines), "entries": entries}
+
+
+@app.post("/api/eval/score")
+def api_eval_score(body: dict | None = None) -> dict:
+    """对 eval_manual_*.jsonl + session jsonl 自动打分（10 Tasks rubric）"""
+    body = body or {}
+    date = str(body.get("date") or _dt.now(_tz.utc).strftime("%Y-%m-%d"))
+    session_keys = body.get("sessionKeys")
+    try:
+        _test_dir = ROOT / "测试"
+        if str(_test_dir) not in sys.path:
+            sys.path.insert(0, str(_test_dir))
+        from manual_eval.score_from_logs import run_score_report
+
+        report = run_score_report(
+            log_file=_eval_log_path(date),
+            sessions_dir=SESSIONS_DIR,
+            session_keys=session_keys,
+            tasks_manifest=ROOT / "测试" / "manual_eval" / "tasks_10.json",
+            repo_root=ROOT,
+        )
+        return {"ok": True, "report": report}
+    except Exception as e:
+        raise HTTPException(500, str(e)) from e

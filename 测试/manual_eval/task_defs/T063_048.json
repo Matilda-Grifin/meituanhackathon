@@ -1,0 +1,131 @@
+{
+  "id": "T063_048",
+  "domain": "travel_local",
+  "difficulty": "hard",
+  "trip_mode": "nearby",
+  "requires_dining": true,
+  "message_history": [],
+  "environment": {
+    "time": "2026-06-17 09:00:00",
+    "timezone": "Asia/Shanghai",
+    "user_id": "u_mock_006",
+    "location": [
+      {
+        "label": "home",
+        "address": "洛阳市洛龙区开元大道268号（虚构）",
+        "longitude": 112.45404,
+        "latitude": 34.619683
+      },
+      {
+        "label": "work",
+        "address": "洛阳市西工区中州中路（虚构）",
+        "longitude": 112.428523,
+        "latitude": 34.663992
+      }
+    ],
+    "user_historical_behaviors": {
+      "用户id": "u_mock_006",
+      "昵称": "孙姨",
+      "职业": "退休",
+      "性别": "女",
+      "年龄段": "54~58",
+      "常住地": "洛阳",
+      "家庭住址": "洛阳市洛龙区开元大道268号（虚构）",
+      "工作地址": "洛阳市西工区中州中路（虚构）",
+      "饮食禁忌": "少盐少辣",
+      "口味偏好": [
+        "面食",
+        "博物馆",
+        "公园"
+      ],
+      "消费层级": "质价比",
+      "价格敏感度": "高",
+      "出行半径偏好_km": 10,
+      "dislike_long_queues": true,
+      "常消费餐饮价格带": "人均40~80元",
+      "历史出行摘要": "文化类景点优先，吃饭要清淡座位舒服，台阶多的景区会回避。"
+    },
+    "orders": {
+      "local_life_recent": [
+        {
+          "order_id": "LL202600601",
+          "order_type": "instore_dining",
+          "status": "completed",
+          "create_time": "2026-05-10 12:00:00",
+          "city": "洛阳",
+          "store_name": "某面食店（虚构）",
+          "category": "面食",
+          "party_size": 2,
+          "total_price": 128,
+          "note": "演示订单"
+        },
+        {
+          "order_id": "LL202600602",
+          "order_type": "culture_ticket",
+          "status": "completed",
+          "create_time": "2026-05-21 12:00:00",
+          "city": "洛阳",
+          "venue_name": "洛阳某文化场馆（虚构）",
+          "category": "展览",
+          "party_size": 2,
+          "total_price": 98,
+          "note": "双人票"
+        },
+        {
+          "order_id": "LL202600603",
+          "order_type": "delivery",
+          "status": "completed",
+          "create_time": "2026-05-04 12:00:00",
+          "city": "洛阳",
+          "store_name": "某公园店（虚构）",
+          "category": "公园",
+          "party_size": 1,
+          "total_price": 76,
+          "note": "演示订单"
+        }
+      ]
+    }
+  },
+  "user_scenario": {
+    "user_profile": {
+      "用户id": "u_mock_006",
+      "昵称": "孙姨",
+      "年龄": 56,
+      "性别": "女",
+      "常住地": "洛阳",
+      "职业": "退休",
+      "家庭情况": "与老伴2人",
+      "同行人员": "与老伴2人",
+      "家庭住址": "洛阳市洛龙区开元大道268号（虚构）",
+      "饮食禁忌": "少盐少辣",
+      "性格": "行动慢，怕台阶，要休息点"
+    }
+  },
+  "instructions": "今天是2026年6月17日，与老伴2人在家附近玩半日（大约4~6小时），半日内包含清淡面食，人均40~80元，饮食要符合少盐少辣。主要想博物馆+公园，单程打车40分钟以内。Agent 须用工具查当天天气，用高德搜真实 POI 并给出分时段动线（含交通建议）。方案须含娱乐/文化类与餐饮类 POI，至少3个可执行锚点（含正餐）。动线须少台阶、步行段短，注明无障碍或电梯友好。首次只说：「我和老伴想在附近玩半天，少台阶少走路」；Agent 反问后再补充人数、预算、忌口、出门时间。若 Agent 未查天气/未搜 POI/方案不符，要追问改方案；满意后表示可以按计划走。",
+  "evaluation_criteria": {
+    "expected_states": [
+      {
+        "state_rubrics": [
+          "Agent 须调用天气工具查询洛阳在2026-06-17（或当次出行时段）的天气，并在方案中体现是否影响出行",
+          "Agent 须调用 POI 搜索工具，方案中引用的 POI 来自工具返回（含名称或可核对信息），不得纯编造",
+          "方案须同时包含玩乐/文化类与餐饮类 POI，至少3个可执行锚点（含正餐）",
+          "餐饮须体现用户饮食要符合少盐少辣及人均40~80元约束",
+          "动线须从用户居住区域出发的周边范围，单程打车40分钟以内",
+          "须给出分时段安排及点间交通或路程依据（路线工具或明确分钟数）",
+          "动线须体现少台阶/短步行或无障碍友好"
+        ]
+      }
+    ],
+    "overall_rubrics": [
+      "最终方案须为可照着执行的半日行程，与「与老伴2人、博物馆+公园」目标一致",
+      "若 Agent 未完成关键约束即声称结束，相关 rubric 不应判为满足"
+    ]
+  },
+  "_meta": {
+    "purpose": "6.3 测评 Task；虚构用户与订单",
+    "seed_user": "meituan-lifecare-agent/workspace/mock/user_and_reviews.seed.json#u_mock_006",
+    "scenario_label": "洛阳无障碍半日",
+    "agent_visible_note": "Agent 仅可见 environment 摘要 + 对话；不可见 instructions 全文",
+    "created_at": "2026-06-03"
+  }
+}

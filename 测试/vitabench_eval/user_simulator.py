@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from vitabench_eval.llm_client import chat_completion, load_repo_env
+from vitabench_eval.llm_client import chat_completion_with_usage, load_repo_env, merge_usage
 from vitabench_eval.prompt_loader import load_yaml_prompt
 
 STOP = "###STOP###"
@@ -18,11 +18,23 @@ def _load_prompt() -> str:
 
 
 class UserSimulator:
-    def __init__(self, task: dict, *, model: str = "user", temperature: float = 0.6):
+    def __init__(
+        self,
+        task: dict,
+        *,
+        model: str = "user",
+        temperature: float = 0.6,
+        session_id: str = "",
+        batch: str = "",
+    ):
         load_repo_env()
         self.task = task
         self.model = model
         self.temperature = temperature
+        self.session_id = session_id
+        self.batch = batch
+        self.usage_total: dict = {"input": 0, "output": 0, "total": 0, "reasoning": 0, "cacheRead": 0, "runs": 0}
+        self.usage_model = ""
         persona = json.dumps(task.get("user_scenario", {}).get("user_profile") or {}, ensure_ascii=False, indent=2)
         instructions = task.get("instructions") or ""
         self.system = _load_prompt().format(persona=persona, instructions=instructions)
@@ -34,7 +46,20 @@ class UserSimulator:
             msgs = list(messages)
             if attempt > 0:
                 msgs.append({"role": "user", "content": _EMPTY_RETRY_NUDGE})
-            text = (chat_completion(model=self.model, messages=msgs, temperature=self.temperature) or "").strip()
+            out = chat_completion_with_usage(
+                model=self.model,
+                messages=msgs,
+                temperature=self.temperature,
+                usage_role="user_sim",
+                session_id=self.session_id,
+                task_id=str(self.task.get("id") or ""),
+                batch=self.batch,
+            )
+            merge_usage(self.usage_total, out.get("usage"), model=out.get("model") or "")
+            if out.get("model"):
+                self.usage_model = out["model"]
+            self.usage_total["runs"] = int(self.usage_total.get("runs") or 0) + 1
+            text = (out.get("text") or "").strip()
             if text:
                 return text
         return STOP

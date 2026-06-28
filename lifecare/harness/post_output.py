@@ -5,7 +5,7 @@ from typing import Any
 
 from lifecare.harness.checklist import apply_checklist_patches, run_checklist
 from lifecare.harness.events import log_audit, log_event
-from lifecare.harness.poi_whitelist import apply_poi_whitelist, build_whitelist_from_tools
+from lifecare.harness.poi_whitelist import apply_poi_images, apply_poi_whitelist, build_whitelist_from_tools
 from lifecare.harness.policy_loader import load_policy, load_repairs
 from lifecare.harness.session_state import load_state, on_assistant_message, resolve_stage
 
@@ -233,6 +233,16 @@ def validate_and_repair(
                         session_key=session_key,
                         action="poi_whitelist",
                         extra=poi_audit,
+                    )
+
+                # 追问改方案常丢段内配图：方案缺图且历史 search 有 photo_urls 时兜底补图
+                out, imgs_added = apply_poi_images(out, whitelist)
+                if imgs_added:
+                    repairs_applied.append("poi_images")
+                    log_audit(
+                        session_key=session_key,
+                        action="poi_images",
+                        extra={"inserted": len(imgs_added), "whitelist_size": len(whitelist)},
                     )
 
     on_assistant_message(session_key, out)

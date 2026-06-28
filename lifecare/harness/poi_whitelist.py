@@ -23,6 +23,7 @@ class PoiEntry:
     amap_place_url: str
     normalized: str = ""
     poi_type: str = ""
+    photo_urls: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.normalized:
@@ -76,7 +77,11 @@ def extract_pois_from_tool_result(result: str) -> list[PoiEntry]:
             continue
         url = str(p.get("amap_place_url") or f"https://www.amap.com/place/{pid}")
         ptype = str(p.get("type") or "")
-        out.append(PoiEntry(id=pid, name=name, amap_place_url=url, poi_type=ptype))
+        photos = [
+            u for u in (p.get("photo_urls") or [])
+            if isinstance(u, str) and u.startswith(("http://", "https://"))
+        ][:3]
+        out.append(PoiEntry(id=pid, name=name, amap_place_url=url, poi_type=ptype, photo_urls=photos))
     return out
 
 
@@ -88,17 +93,30 @@ def build_whitelist_from_tools(tools_called: list[dict[str, Any]]) -> list[PoiEn
             continue
         for entry in tc.get("pois") or []:
             if isinstance(entry, dict) and entry.get("id"):
+                photos = [
+                    u for u in (entry.get("photo_urls") or [])
+                    if isinstance(u, str) and u.startswith(("http://", "https://"))
+                ][:3]
                 e = PoiEntry(
                     id=str(entry["id"]),
                     name=str(entry.get("name") or ""),
                     amap_place_url=str(entry.get("amap_place_url") or ""),
                     poi_type=str(entry.get("poi_type") or ""),
+                    photo_urls=photos,
                 )
-                seen[e.id] = e
+                _merge_into(seen, e)
         raw = tc.get("result_preview") or tc.get("result") or ""
         for e in extract_pois_from_tool_result(raw):
-            seen[e.id] = e
+            _merge_into(seen, e)
     return list(seen.values())
+
+
+def _merge_into(seen: dict[str, PoiEntry], e: PoiEntry) -> None:
+    """合并同 id POI：保留已有 photo_urls，避免被无图来源覆盖。"""
+    prev = seen.get(e.id)
+    if prev is not None and not e.photo_urls and prev.photo_urls:
+        e.photo_urls = prev.photo_urls
+    seen[e.id] = e
 
 
 def _is_generic(name: str) -> bool:
@@ -234,3 +252,51 @@ def apply_poi_whitelist(text: str, whitelist: list[PoiEntry]) -> tuple[str, Whit
         result.replacements.append({"from": old, "to": repl.name, "id": repl.id})
 
     return out, result
+
+
+IMG_MD_RE = re.compile(r"!\[[^\]]*\]\(https?://")
+
+
+def apply_poi_images(
+    text: str,
+    whitelist: list[PoiEntry],
+    *,
+    max_images: int = 4,
+) -> tuple[str, list[str]]:
+    """方案缺图时，按正文里已出现且命中白名单的 POI 段落补 `![](photo_url)`。
+
+    只在正文**当前无任何 Markdown 图片**时触发（绝不改动模型自带的图）。
+    一个 POI 最多补 1 张，全文上限 max_images，避免堆图。
+    返回 (新正文, 已插入的图片 markdown 列表)。
+    """
+    if not whitelist or not text:
+        return text, []
+    if IMG_MD_RE.search(text):
+        return text, []
+    if not any(e.photo_urls for e in whitelist):
+        return text, []
+
+    inserts: list[tuple[int, str]] = []
+    used: set[str] = set()
+    for cand in extract_poi_candidates(text):
+        if cand.source not in ("heading", "amap_link") or not cand.span:
+            continue
+        matched = match_poi(cand, whitelist)
+        if not matched or not matched.photo_urls or matched.id in used:
+            continue
+        used.add(matched.id)
+        nl = text.find("\n", cand.span[1])
+        pos = nl if nl >= 0 else len(text)
+        inserts.append((pos, f"\n\n![{matched.name}]({matched.photo_urls[0]})"))
+        if len(inserts) >= max_images:
+            break
+
+    if not inserts:
+        return text, []
+
+    out = text
+    applied: list[str] = []
+    for pos, img in sorted(inserts, key=lambda x: x[0], reverse=True):
+        out = out[:pos] + img + out[pos:]
+        applied.append(img)
+    return out, applied

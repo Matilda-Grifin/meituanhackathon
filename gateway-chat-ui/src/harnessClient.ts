@@ -23,6 +23,7 @@ export function shouldCallHarnessForAssistantText(text: string): boolean {
 export async function notifyHarnessUserMessage(
   sessionKey: string,
   message: string,
+  opts?: { intakeSkipped?: boolean },
 ): Promise<void> {
   const sk = sessionKey.trim();
   const msg = message.trim();
@@ -31,7 +32,11 @@ export async function notifyHarnessUserMessage(
     await fetch("/api/harness/on-user-message", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_key: sk, message: msg }),
+      body: JSON.stringify({
+        session_key: sk,
+        message: msg,
+        intake_skipped: !!opts?.intakeSkipped,
+      }),
     });
   } catch {
     // 非阻塞：Harness 失败不影响对话

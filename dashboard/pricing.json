@@ -1,0 +1,91 @@
+{
+  "_comment": "LifeCare 费用看板单价（CNY 为主；OpenRouter 按 fxUsdToCny 折算）。对账以各控制台为准。",
+  "_updatedAt": "2026-06-06",
+  "currency": "CNY",
+  "fxUsdToCny": 7.25,
+  "evalSessionPrefix": "v63-",
+  "textModels": {
+    "qwen3.6-plus": {
+      "label": "Qwen 3.6 Plus",
+      "provider": "dashscope",
+      "currency": "CNY",
+      "reasoningUsesOutputPrice": true,
+      "tiers": [
+        {
+          "maxInputTokens": 32000,
+          "label": "输入 0–32K",
+          "inputPerMillion": 0.8,
+          "outputPerMillion": 2.0,
+          "cacheReadPerMillion": 0.16
+        },
+        {
+          "maxInputTokens": 128000,
+          "label": "输入 32K–128K",
+          "inputPerMillion": 1.2,
+          "outputPerMillion": 3.0,
+          "cacheReadPerMillion": 0.24
+        }
+      ],
+      "_source": "https://help.aliyun.com/zh/model-studio/model-pricing"
+    },
+    "qwen-plus": {
+      "label": "Qwen Plus",
+      "provider": "dashscope",
+      "currency": "CNY",
+      "reasoningUsesOutputPrice": true,
+      "inputPerMillion": 0.8,
+      "outputPerMillion": 2.0,
+      "cacheReadPerMillion": 0.16
+    },
+    "deepseek/deepseek-v4-flash": {
+      "label": "DeepSeek V4 Flash",
+      "provider": "openrouter",
+      "currency": "USD",
+      "reasoningUsesOutputPrice": true,
+      "inputPerMillion": 0.1,
+      "outputPerMillion": 0.2,
+      "cacheReadPerMillion": 0.02,
+      "_source": "https://openrouter.ai/deepseek/deepseek-v4-flash"
+    },
+    "deepseek-chat": {
+      "label": "DeepSeek Chat",
+      "provider": "deepseek",
+      "currency": "CNY",
+      "inputPerMillion": 1.0,
+      "outputPerMillion": 2.0
+    },
+    "openai/gpt-5.5": {
+      "label": "GPT-5.5 (Judge)",
+      "provider": "openrouter",
+      "currency": "USD",
+      "reasoningUsesOutputPrice": true,
+      "inputPerMillion": 5.0,
+      "outputPerMillion": 30.0,
+      "cacheReadPerMillion": 0.5,
+      "_source": "https://openrouter.ai/openai/gpt-5.5"
+    }
+  },
+  "mcpTools": {
+    "lifecare_search_places": {
+      "label": "高德 POI 搜索",
+      "perCall": 0.003,
+      "_source": "https://lbs.amap.com/upgrade 30元/万次"
+    },
+    "lifecare_plan_route": {
+      "label": "高德路线规划",
+      "perCall": 0.003
+    },
+    "lifecare_get_weather": {
+      "label": "天气查询",
+      "perCall": 0.0
+    },
+    "search_places": { "label": "POI 搜索", "perCall": 0.003 },
+    "plan_route": { "label": "路线规划", "perCall": 0.003 },
+    "get_weather": { "label": "天气", "perCall": 0.0 }
+  },
+  "roleLabels": {
+    "agent": "Agent（Qwen）",
+    "user_sim": "用户模拟器",
+    "judge": "裁判"
+  }
+}

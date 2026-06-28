@@ -10,7 +10,8 @@ import {
   extractIntakeRemainderText,
   hasIntakeQuestions,
 } from "./intakeParse";
-import { isLocationContextMessage } from "./location";
+import { isLocationContextOnlyMessage, extractUserVisibleTextFromMessage } from "./location";
+import { isWarmupMessage } from "./sessionWarmup";
 
 export function extractRunId(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
@@ -24,7 +25,8 @@ export function isItineraryImageBubble(text: string): boolean {
 
 export function isIntakeQuestionText(text: string): boolean {
   if (/行程速览|预算参考|##\s*📋/.test(text)) return false;
-  if (/第\s*1\s*题/.test(text)) return true;
+  if (/第\s*\d+\s*题/.test(text) && /(?:^|\n)\s*[A-F][\.、．、：)]\s/m.test(text)) return true;
+  if (/\d+\uFE0F?\u20E3/.test(text) && /(?:^|\n)\s*[A-F][\.、．、：)]\s/m.test(text)) return true;
   return /^\s*1[\.、．]\s/m.test(text) && /(?:^|\n)\s*[A-F][\.、．\)]\s/m.test(text);
 }
 
@@ -49,11 +51,43 @@ export function isPlanMessage(text: string): boolean {
   return false;
 }
 
+/** 跳过选择题后进 B 阶段的首句声明（须独立展示，不参与 ack 隐藏/合并） */
+export function isSkipIntakeEntryAck(text: string): boolean {
+  const t = text.trim();
+  if (!t || t.length > 680) return false;
+  if (isPlanMessage(t) || isIntakeQuestionText(t)) return false;
+  return /不再重复问卷/.test(t);
+}
+
+/** 流式缓冲里若已完整输出跳过声明，拆成独立泡 + 后续正文 */
+export function extractPinnedSkipIntakeEntryAck(
+  stream: string,
+): { ack: string; remainder: string } | null {
+  const t = stream.trim();
+  if (!t || !isSkipIntakeEntryAck(t)) return null;
+
+  const planStart = t.search(/^#\s/m);
+  const sectionStart = t.search(/^##\s/m);
+  const cutAt = planStart >= 0 ? planStart : sectionStart >= 0 ? sectionStart : -1;
+  if (cutAt > 80) {
+    const ackPart = t.slice(0, cutAt).trim();
+    if (isSkipIntakeEntryAck(ackPart)) {
+      return { ack: ackPart, remainder: t.slice(cutAt).trimStart() };
+    }
+  }
+
+  if (!isPlanMessage(t) && /正在查天气|正在并行|搜点|检索地点/.test(t)) {
+    return { ack: t, remainder: "" };
+  }
+  return null;
+}
+
 export function isAckMessage(text: string): boolean {
   const t = text.trim();
   if (!t || t.length > 520) return false;
   if (isPlanMessage(t) || isItineraryImageBubble(t)) return false;
   if (isIntakeQuestionText(t)) return false;
+  if (isSkipIntakeEntryAck(t)) return false;
   return /好的|收到|明白|正在查|正在并行|搜点|检索地点|重新规划|改成|改为/.test(t);
 }
 
@@ -72,7 +106,8 @@ export function stripLeadingAckFromPlan(plan: string, ack?: string): string {
   const sectionStart = t.search(/^##\s/m);
   const cutAt = planStart >= 0 ? planStart : sectionStart >= 0 ? sectionStart : -1;
 
-  const ackLike = /^好的|^收到|^明白|^数据都齐了|重新规划如下|规划如下|下面给你|^---\s*$/m;
+  const ackLike =
+    /^好的|^收到|^明白|^数据都齐了|不再重复问卷|重新规划如下|规划如下|下面给你|^---\s*$/m;
   if (cutAt > 0) {
     const head = t.slice(0, cutAt);
     if (ackLike.test(head) || (ack && head.includes(ack.slice(0, Math.min(40, ack.length))))) {
@@ -92,9 +127,31 @@ export function stripLeadingAckFromPlan(plan: string, ack?: string): string {
   return t;
 }
 
-export function liveStreamDisplayText(streaming: string, ackText: string, ackFlushed: boolean): string {
+export function liveStreamDisplayText(
+  streaming: string,
+  ackText: string,
+  ackFlushed: boolean,
+  pinnedSkipAck?: string,
+  suppressAck = false,
+): string {
   const s = streaming.trim();
   if (!s) return "";
+  const pinned = pinnedSkipAck?.trim();
+  if (pinned && pinned.length > 12) {
+    if (s === pinned || s.startsWith(pinned)) {
+      const rest = s.slice(pinned.length).trimStart();
+      if (!rest) return "";
+      if (isPlanMessage(rest)) return stripLeadingAckFromPlan(rest, pinned);
+      return rest;
+    }
+  }
+  // 计划/追问阶段：ack（「好的，正在并行查天气…」）只走任务进展条，
+  // 对话区不展示纯 ack 文本，避免闪一下又被方案正文顶掉（出现又消失）。
+  if (suppressAck) {
+    if (isPlanMessage(s)) return stripLeadingAckFromPlan(s, ackText || undefined);
+    if (isAckMessage(s)) return "";
+    if (!ackFlushed || !ackText) return s;
+  }
   if (!ackFlushed || !ackText) return s;
   if (isPlanMessage(s)) return stripLeadingAckFromPlan(s, ackText);
   if (isAckMessage(s) && !isPlanMessage(s)) return "";
@@ -105,9 +162,11 @@ function normRole(role: string): string {
   return String(role).toLowerCase();
 }
 
-/** 对话区可见的用户消息（不含隐藏的位置上下文注入） */
+/** 对话区可见的用户消息（不含仅位置注入 / 预热 hidden user） */
 export function isVisibleUserRow(row: ChatRow): boolean {
-  return normRole(row.role) === "user" && !isLocationContextMessage(row.text);
+  if (normRole(row.role) !== "user") return false;
+  if (isWarmupMessage(row.text)) return false;
+  return !isLocationContextOnlyMessage(row.text);
 }
 
 /** 首条可见用户消息的下标；-1 表示尚无用户发言 */
@@ -141,10 +200,25 @@ function expandIntakeAssistantRows(assistants: ChatRow[]): ChatRow[] {
   return out;
 }
 
+function expandSkipIntakeEntryAckRows(assistants: ChatRow[]): ChatRow[] {
+  const out: ChatRow[] = [];
+  for (const r of assistants) {
+    const split = extractPinnedSkipIntakeEntryAck(r.text);
+    if (split?.remainder && split.remainder.length > 40) {
+      const ackId = r.id.startsWith("a-skip-intake-") ? r.id : `${r.id}-skip-ack`;
+      out.push({ ...r, id: ackId, text: split.ack });
+      out.push({ ...r, id: `${r.id}-plan`, text: split.remainder });
+      continue;
+    }
+    out.push(r);
+  }
+  return out;
+}
+
 function mergeAssistantGroup(items: ChatRow[]): ChatRow[] {
   if (!items.length) return [];
 
-  const assistants = items.filter((r) => normRole(r.role) === "assistant");
+  let assistants = items.filter((r) => normRole(r.role) === "assistant");
   const others = items.filter((r) => normRole(r.role) !== "assistant");
   if (!assistants.length) return items;
 
@@ -155,13 +229,20 @@ function mergeAssistantGroup(items: ChatRow[]): ChatRow[] {
     return [...others, ...expanded];
   }
 
+  assistants = expandSkipIntakeEntryAckRows(assistants);
+
   const imageRows = assistants.filter((r) => isItineraryImageBubble(r.text));
   const nonImage = assistants.filter((r) => !isItineraryImageBubble(r.text));
 
   const filtered = nonImage.filter((r) => !isNoiseAssistantSegment(r.text));
   const src = filtered.length ? filtered : nonImage;
 
-  const ackCandidates = src.filter((r) => isAckMessage(r.text));
+  const skipEntryAckRows = src.filter((r) => isSkipIntakeEntryAck(r.text));
+  const skipEntryAckIds = new Set(skipEntryAckRows.map((r) => r.id));
+  const skipEntryAck =
+    skipEntryAckRows.sort((a, b) => b.text.length - a.text.length)[0] ?? null;
+
+  const ackCandidates = src.filter((r) => isAckMessage(r.text) && !skipEntryAckIds.has(r.id));
   const planCandidates = src.filter((r) => isPlanMessage(r.text));
   const ack = ackCandidates.sort((a, b) => b.text.length - a.text.length)[0] ?? null;
   const ackIds = new Set(ackCandidates.map((r) => r.id));
@@ -170,24 +251,28 @@ function mergeAssistantGroup(items: ChatRow[]): ChatRow[] {
   const usedIds = new Set<string>();
   if (ack) usedIds.add(ack.id);
   if (plan) usedIds.add(plan.id);
+  if (skipEntryAck) usedIds.add(skipEntryAck.id);
 
-  const rest = src.filter((r) => !usedIds.has(r.id) && !ackIds.has(r.id));
+  const rest = src.filter(
+    (r) => !usedIds.has(r.id) && !ackIds.has(r.id) && !skipEntryAckIds.has(r.id),
+  );
 
-  if (!plan && !ack) {
+  if (!plan && !ack && !skipEntryAck) {
     if (src.length === 1) return [...others, ...src, ...imageRows];
     const longest = [...src].sort((a, b) => b.text.length - a.text.length)[0]!;
     return [...others, longest, ...imageRows];
   }
 
   const out: ChatRow[] = [...others];
+  if (skipEntryAck) out.push(skipEntryAck);
   if (plan) {
-    const text = stripLeadingAckFromPlan(plan.text, ack?.text);
+    const text = stripLeadingAckFromPlan(plan.text, ack?.text ?? skipEntryAck?.text);
     if (text.trim() && !isEmptyAssistantPlaceholder(text)) {
       out.push({ ...plan, text });
     }
   } else if (rest.length) {
     out.push(...rest);
-  } else if (!ack && src.length) {
+  } else if (!ack && !skipEntryAck && src.length) {
     out.push(src[src.length - 1]!);
   }
   out.push(...imageRows);
@@ -211,6 +296,16 @@ export function presentChatRows(allRows: ChatRow[]): ChatRow[] {
   for (const row of rows) {
     if (normRole(row.role) === "user") {
       flushGroup();
+      const visible =
+        extractUserVisibleTextFromMessage(row.text).trim() || row.text.trim();
+      const last = out[out.length - 1];
+      if (
+        last &&
+        normRole(last.role) === "user" &&
+        (extractUserVisibleTextFromMessage(last.text).trim() || last.text.trim()) === visible
+      ) {
+        continue;
+      }
       out.push(row);
     } else {
       group.push(row);

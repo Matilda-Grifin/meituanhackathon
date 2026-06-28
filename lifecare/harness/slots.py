@@ -25,6 +25,15 @@ PLANNING_INTENT_RE = re.compile(
     r"安排|规划|行程|去哪玩|半日|一日|逛逛|出游|带娃出门|聚会怎么玩|帮我.plan|玩什么|附近玩|怎么玩|在.{0,8}玩|出门玩"
 )
 WEATHER_ONLY_RE = re.compile(r"天气|气温|下雨|降温|穿衣|冷吗|热吗|预报|降雨|风力")
+# 规划上下文词：出现即说明在安排出行（即便没命中 PLANNING_INTENT_RE）。
+# light_weather 据此改为 fail-open：只有「明确纯查天气」才降级，拿不准一律放行规划。
+PLANNING_CONTEXT_RE = re.compile(
+    r"看展|展览|博物馆|美术馆|画展|公园|湖边|景点|景区|古镇|寺庙|乐园|游乐|"
+    r"吃|餐|饭|菜|午餐|晚餐|早餐|咖啡|奶茶|探店|美食|"
+    r"行程|路线|动线|安排|玩|逛|散步|走走|遛|出游|一日|半日|半天|"
+    r"带娃|亲子|孩子|老人|朋友|约会|情侣|闺蜜|"
+    r"门票|预约|停车|地铁|打车|步行|怎么去"
+)
 CHITCHAT_RE = re.compile(
     r"^(你好|谢谢|您好|在吗|哈喽|hi|hello|好的|嗯|收到|再见|拜拜)[!！?？。.\s]*$",
     re.I,
@@ -43,6 +52,8 @@ class Slots:
     half_day: bool = False
     anchors_per_day: int = 4
     intake_submitted: bool = False
+    intake_consumed: bool = False
+    intake_mode: str | None = None  # formal | defaults | skipped_freetext
     user_messages: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -54,6 +65,8 @@ class Slots:
             "half_day": self.half_day,
             "anchors_per_day": self.anchors_per_day,
             "intake_submitted": self.intake_submitted,
+            "intake_consumed": self.intake_consumed,
+            "intake_mode": self.intake_mode,
         }
 
 
@@ -87,13 +100,43 @@ def _detect_trip_days(texts: list[str]) -> int:
     return 1
 
 
+FREETEXT_INTAKE_HINTS = re.compile(
+    r"地铁|自驾|打车|公交|步行|半天|一天|几小时|不忌口|口味|忌口|"
+    r"老人|孩子|带娃|朋友|情侣|家庭|创意菜|清淡|辣|不辣|"
+    r"第\d+题选[A-F]|选[A-F]"
+)
+
+
+def _detect_freetext_intake_skip(messages: list[str]) -> bool:
+    user_turns = [
+        m.strip()
+        for m in messages
+        if m.strip() and not m.startswith("[位置上下文]") and not INTAKE_SUBMISSION_RE.search(m)
+    ]
+    if len(user_turns) < 2:
+        return False
+    return any(len(m) >= 6 and FREETEXT_INTAKE_HINTS.search(m) for m in user_turns[1:])
+
+
 def parse_slots_from_messages(messages: list[str]) -> Slots:
     slots = Slots(user_messages=list(messages))
     blob = "\n".join(messages)
 
     if INTAKE_SUBMISSION_RE.search(blob):
         slots.intake_submitted = True
+        slots.intake_consumed = True
+        slots.intake_mode = "formal"
         slots.ready = True
+
+    if re.search(r"全部用默认|直接回复.*默认", blob):
+        slots.intake_consumed = True
+        slots.intake_mode = "defaults"
+        slots.ready = True
+
+    freetext_skip = _detect_freetext_intake_skip(messages)
+    if freetext_skip:
+        slots.intake_consumed = True
+        slots.intake_mode = "skipped_freetext"
 
     for msg in messages:
         if _detect_party_size(msg):
@@ -107,15 +150,16 @@ def parse_slots_from_messages(messages: list[str]) -> Slots:
     slots.anchors_per_day = 3 if slots.half_day else 4
 
     if not slots.ready:
-        planning_intent = re.search(
-            r"安排|规划|行程|去哪玩|半日|一日|逛逛|出游|带娃出门|聚会怎么玩",
-            blob,
-        )
+        # 用统一的 detect_planning_intent（含规划上下文词），修窄正则漏判导致首轮被判闲聊。
+        planning_intent = detect_planning_intent(blob)
         if planning_intent and slots.party_size and slots.city:
             slots.ready = True
         if planning_intent and INTAKE_SUBMISSION_RE.search(blob):
             slots.ready = True
         if re.search(r"全部用默认|直接回复.*默认", blob):
+            slots.ready = True
+        # 用户不点选、用口语回复问卷：视为槽位已提交，允许进入 B 阶段
+        if planning_intent and freetext_skip:
             slots.ready = True
 
     return slots
@@ -143,16 +187,32 @@ def detect_full_plan(assistant_text: str) -> bool:
 
 
 def detect_planning_intent(blob: str) -> bool:
-    return bool(PLANNING_INTENT_RE.search(blob or ""))
+    t = blob or ""
+    if PLANNING_INTENT_RE.search(t):
+        return True
+    # fail-open：含规划上下文词且有一定信息量（非短问候）也算规划意图，
+    # 避免 PLANNING_INTENT_RE 漏判「看展/公园/创意菜/慢慢逛」这类口语诉求被当成闲聊/纯天气。
+    if PLANNING_CONTEXT_RE.search(t) and len(t.strip()) >= 10:
+        return True
+    return False
 
 
 def detect_light_weather(last_user: str, blob: str = "") -> bool:
+    """仅当消息「明确就是纯查天气」时才判 light_weather（fail-open）。
+
+    旧逻辑是 fail-closed：regex 漏判一个规划词就误判纯天气 → 拦死整轮搜点/算路。
+    代价不对称——误把规划判成纯天气会让用户看到「实时查询不可用」；反之只是多搜一次。
+    故改为：本条/整段只要带任何规划意图或规划上下文词、或消息过长，就不降级。
+    """
     t = (last_user or "").strip()
     if not t or not WEATHER_ONLY_RE.search(t):
         return False
-    if detect_planning_intent(t):
+    if detect_planning_intent(t) or PLANNING_CONTEXT_RE.search(t):
         return False
-    if detect_planning_intent(blob) and not WEATHER_ONLY_RE.search(blob.replace(t, "")):
+    if detect_planning_intent(blob) or PLANNING_CONTEXT_RE.search(blob):
+        return False
+    # 纯天气问句通常很短；过长基本是混合诉求 → 放行规划
+    if len(t) > 40:
         return False
     return True
 

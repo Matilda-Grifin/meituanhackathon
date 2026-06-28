@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   GatewayBrowserClient,
   GatewayRequestError,
@@ -11,15 +11,19 @@ import {
   reconcileChatRows,
   lastUserTextInRows,
   getChatEventState,
+  rowsStableSignature,
   type ChatRow,
 } from "./chatHistoryMerge";
 import {
-  formatLocationContextMessage,
+  extractUserVisibleTextFromMessage,
   hasStoredLocationConsent,
   isLocationContextMessage,
+  isLocationContextOnlyMessage,
   loadStoredLocationSnapshot,
-  LOCATION_INJECT_WAIT_MS,
+  locationSnapshotKey,
+  mergeLocationPrefix,
   resolveUserLocationTimed,
+  shouldInjectLocationPrefix,
   storeLocationConsent,
   storeLocationSnapshot,
   type ResolvedLocation,
@@ -28,14 +32,17 @@ import {
   cancelItineraryImageJob,
   formatItineraryImageMarkdown,
   findLongestPlanText,
+  hasVisibleUserAfterRowIndex,
   isCompleteItineraryPlan,
   planTextFingerprint,
   requestItineraryImage,
   rowsHasItineraryImage,
+  shouldAllowItineraryImageForRows,
   toolEventUsedSearchPlaces,
 } from "./itineraryImage";
 import {
   appendPersistedItineraryImage,
+  clearPersistedItineraryImage,
   persistItineraryImageRow,
   sessionHasPersistedItineraryImage,
 } from "./itineraryImageStorage";
@@ -47,9 +54,6 @@ import { StreamingMarkdown } from "./StreamingMarkdown";
 import { shouldStreamMarkdown } from "./streamMarkdown";
 import {
   isWarmupMessage,
-  shouldStartWarmup,
-  WARMUP_MESSAGE,
-  WARMUP_TIMEOUT_MS,
   type WarmupState,
 } from "./sessionWarmup";
 import { IntakeCard } from "./IntakeCard";
@@ -67,8 +71,11 @@ import {
 } from "./assistantPlaceholders";
 import {
   extractRunId,
+  extractPinnedSkipIntakeEntryAck,
   isAckMessage,
+  isIntakeQuestionText,
   isPlanMessage,
+  isSkipIntakeEntryAck,
   liveStreamDisplayText,
   indexOfFirstVisibleUser,
   isVisibleUserRow,
@@ -79,6 +86,7 @@ import {
   appendProcessStep,
   appendToolProgressStep,
   appendToolStepsFromPayload,
+  filterIntakePhaseToolSteps,
   historyDataUsedSearchPlaces,
   labelForTool,
   type ProcessStep,
@@ -172,12 +180,14 @@ function isRawToolPayloadText(text: string): boolean {
 
 function isHiddenChatRow(role: string, text: string): boolean {
   const rl = String(role).toLowerCase();
-  if (rl === "user" && isLocationContextMessage(text)) return true;
+  if (rl === "user" && isLocationContextOnlyMessage(text)) return true;
   if (rl === "user" && isWarmupMessage(text)) return true;
   if (rl === "user" && isIntakeDisplayHiddenUserRow(text)) return true;
   if (rl === "tool" || rl === "toolresult") return true;
   if (isRawToolPayloadText(text)) return true;
   if (rl === "assistant" && isNoiseAssistantBubble(stripAssistantToolNoise(text))) return true;
+  if (rl === "assistant" && isLocationBootstrapGreeting(text)) return true;
+  if (rl === "assistant" && isSkipIntakeEntryAck(text)) return false;
   if (rl === "assistant" && isAckMessage(text) && !isPlanMessage(text)) return true;
   return false;
 }
@@ -210,6 +220,20 @@ function formatToolTranscriptText(raw: string): string {
   }
 }
 
+/** 从 WebSocket 事件 payload 中提取工具名（用于时序记录） */
+function extractToolName(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const p = payload as Record<string, unknown>;
+  const name = p.tool || p.toolName || p.name || p.tool_name;
+  if (typeof name === "string" && name.trim()) return name.trim();
+  const fn = p.function as Record<string, unknown> | undefined;
+  if (fn && typeof fn.name === "string" && fn.name.trim()) return fn.name.trim();
+  const text = typeof p.text === "string" ? p.text : "";
+  const mcpMatch = text.match(/lifecare_(\w+)/);
+  if (mcpMatch) return `lifecare_${mcpMatch[1]}`;
+  return null;
+}
+
 /** 后台 chat.history 等进展，不在「任务进展 · 工具调用」展示 — 见 toolProgress.isHiddenProcessStepMsg */
 
 function appendToolTimeline(
@@ -239,7 +263,7 @@ function shouldSkipHistoryMessage(m: Record<string, unknown>, text: string, role
   const customType = typeof m.customType === "string" ? m.customType : "";
   if (customType.includes("runtime-context") || customType === "openclaw.runtime-context") return true;
   const rlow = String(role).toLowerCase();
-  if (rlow === "user" && isLocationContextMessage(text)) return true;
+  if (rlow === "user" && isLocationContextOnlyMessage(text)) return true;
   if (rlow === "user" && isWarmupMessage(text)) return true;
   if (/Sender \(untrusted metadata\)/i.test(text) && /webchat-ui/i.test(text)) return true;
   if (rlow === "user" && /^Conversation info \(untrusted metadata\)/i.test(text)) return true;
@@ -303,6 +327,7 @@ function extractHistoryRows(data: unknown): { sessionKey?: string; rows: ChatRow
       text = stripLeadingAssistantPlaceholders(stripAssistantToolNoise(text));
       if (isEmptyAssistantPlaceholder(text)) continue;
       if (isRawToolPayloadText(text)) continue;
+      if (isLocationBootstrapGreeting(text)) continue;
     }
     rows.push({ role, text, id: `h-${i++}` });
   }
@@ -369,10 +394,63 @@ function mergeStreamText(prev: string, piece: string): string {
   return prev + p;
 }
 
+/** 位置预注入 / 连接后抢先问候、旧会话 follow-up，不应出现在补槽白面板前 */
+function isLocationBootstrapGreeting(text: string): boolean {
+  const t = text.trim();
+  if (!t || t.length > 520) return false;
+  if (isPlanMessage(t) || isIntakeQuestionText(t)) return false;
+  if (/刚才已经为你规划好了/.test(t)) return true;
+  if (/^你好[呀啊！!]?/.test(t) && /出行管家|本地生活|规划管家/.test(t)) return true;
+  if (/^你好！我是你的/.test(t) && /管家|规划/.test(t)) return true;
+  if (/很高兴为你服务/.test(t) && /周边逛逛|去其他城市|聊聊天/.test(t)) return true;
+  if (/我是你的「本地生活出行管家」/.test(t)) return true;
+  if (/如果有出行计划，随时告诉我/.test(t)) return true;
+  return false;
+}
+
+function hasPlanAfterAnchor(rows: ChatRow[], anchorIdx: number): boolean {
+  for (let i = rows.length - 1; i > anchorIdx; i--) {
+    const r = rows[i]!;
+    if (String(r.role).toLowerCase() === "assistant" && isPlanMessage(r.text)) return true;
+  }
+  return false;
+}
+
+function extractSessionKeyFromPayload(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const scan = (obj: Record<string, unknown>): string | null => {
+    for (const key of ["sessionKey", "sessionId", "key", "canonicalKey"]) {
+      const v = obj[key];
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return null;
+  };
+  const p = payload as Record<string, unknown>;
+  const direct = scan(p);
+  if (direct) return direct;
+  if (p.data && typeof p.data === "object") {
+    const nested = scan(p.data as Record<string, unknown>);
+    if (nested) return nested;
+  }
+  if (p.message && typeof p.message === "object") {
+    const nested = scan(p.message as Record<string, unknown>);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+function eventMatchesActiveSession(payload: unknown, activeSk: string): boolean {
+  if (!activeSk) return true;
+  const evtSk = extractSessionKeyFromPayload(payload);
+  if (!evtSk) return true;
+  return evtSk === activeSk;
+}
+
 function isNoiseAssistantBubble(text: string): boolean {
   if (isEmptyAssistantPlaceholder(text)) return true;
   const t = text.trim();
   if (!t) return true;
+  if (isLocationBootstrapGreeting(t)) return true;
   if (/^（无正文\s*·\s*stop:\s*toolUse）$/i.test(t)) return true;
   if (/^assistant\s*$/i.test(t)) return true;
   return false;
@@ -380,7 +458,7 @@ function isNoiseAssistantBubble(text: string): boolean {
 
 function isIntakeQuestionBubble(text: string): boolean {
   const intakeOnly = extractIntakeOnlyText(text);
-  return hasIntakeQuestions(intakeOnly) && text.trim() === intakeOnly;
+  return hasIntakeQuestions(intakeOnly);
 }
 
 type IntakeSubmittedSnapshot = {
@@ -401,9 +479,23 @@ function findCurrentTurnAnchorIdx(rows: ChatRow[]): number {
   return -1;
 }
 
-function findIntakeAnchorUserId(rows: ChatRow[]): string | null {
-  const idx = findCurrentTurnAnchorIdx(rows);
-  return idx >= 0 ? rows[idx]!.id : null;
+/** 问卷卡片锚点：本趟规划的首条可见用户消息（Agent 选择题回复此句） */
+function findIntakeCardAnchorUserId(rows: ChatRow[]): string | null {
+  let startIdx = 0;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const r = rows[i]!;
+    if (String(r.role).toLowerCase() === "assistant" && isPlanMessage(r.text)) {
+      startIdx = i + 1;
+      break;
+    }
+  }
+  for (let i = startIdx; i < rows.length; i++) {
+    const r = rows[i]!;
+    if (!isVisibleUserRow(r)) continue;
+    if (isIntakeSubmissionText(r.text)) continue;
+    return r.id;
+  }
+  return null;
 }
 
 /** 仅在本轮 anchor 之后、下一条新用户消息之前查找槽位提交 */
@@ -452,8 +544,52 @@ function buildTurnSubmittedIntake(rows: ChatRow[], anchorIdx: number): IntakeSub
   return { blocks, selections, custom, followUp };
 }
 
+/** 口语跳过：首条 user → intake assistant → 第二条可见 user（非选择题答案） */
+function buildFreetextSkippedIntake(rows: ChatRow[], anchorIdx: number): IntakeSubmittedSnapshot | null {
+  let intakeAssistantIdx = -1;
+  for (let i = anchorIdx + 1; i < rows.length; i++) {
+    const r = rows[i]!;
+    if (isVisibleUserRow(r) && !isIntakeSubmissionText(r.text)) {
+      if (intakeAssistantIdx < 0) return null;
+      const blocks = parseQuestionBlocks(extractIntakeOnlyText(rows[intakeAssistantIdx]!.text));
+      if (!blocks.length) return null;
+      return { blocks, selections: {}, custom: {}, followUp: {} };
+    }
+    if (String(r.role).toLowerCase() === "assistant") {
+      const intakeOnly = extractIntakeOnlyText(stripLeadingAssistantPlaceholders(r.text));
+      if (parseQuestionBlocks(intakeOnly).length > 0) {
+        intakeAssistantIdx = i;
+      }
+    }
+  }
+  return null;
+}
+
+function buildTurnIntakeSnapshot(rows: ChatRow[], anchorIdx: number): IntakeSubmittedSnapshot | null {
+  return buildTurnSubmittedIntake(rows, anchorIdx) ?? buildFreetextSkippedIntake(rows, anchorIdx);
+}
+
 function isIntakeSubmissionText(text: string): boolean {
   return /^选择题答案：/.test(text.trim()) || /^全部用默认/.test(text.trim());
+}
+
+/** B 阶段及追问轮：不在对话区 early flush ack（进展条已承载），避免闪一下后消失 */
+function shouldSkipEarlyFlushAckForPlanPhase(
+  rows: ChatRow[],
+  pendingUser: string | null,
+  opts: {
+    toolStarted: boolean;
+    hadSearch: boolean;
+    historyHadSearch: boolean;
+    intakeViaFreetext?: boolean;
+  },
+): boolean {
+  if (opts.toolStarted || opts.hadSearch || opts.historyHadSearch) return true;
+  if (opts.intakeViaFreetext) return true;
+  if (pendingUser && isIntakeSubmissionText(pendingUser)) return true;
+  return rows.some(
+    (r) => String(r.role).toLowerCase() === "user" && isIntakeSubmissionText(r.text),
+  );
 }
 
 /** 槽位提交/API 载荷用户行：不在对话区单独展示（保留在 intake 卡片内） */
@@ -469,10 +605,48 @@ function findSessionPlanningIntake(
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i]!;
     if (!isVisibleUserRow(r) || isIntakeSubmissionText(r.text)) continue;
-    const snap = buildTurnSubmittedIntake(rows, i);
+    const snap = buildTurnIntakeSnapshot(rows, i);
     if (snap) found = { anchorId: r.id, snapshot: snap };
   }
   return found;
+}
+
+function sessionHasDeliveredPlan(rows: ChatRow[]): boolean {
+  return rows.some(
+    (r) => String(r.role).toLowerCase() === "assistant" && isPlanMessage(r.text),
+  );
+}
+
+function hasPlanBeforeAnchor(rows: ChatRow[], anchorIdx: number): boolean {
+  for (let i = 0; i < anchorIdx; i++) {
+    const r = rows[i]!;
+    if (String(r.role).toLowerCase() === "assistant" && isPlanMessage(r.text)) return true;
+  }
+  return false;
+}
+
+function intakeBlocksFingerprint(blocks: IntakeBlock[]): string {
+  return blocks.map((b) => `${b.n}:${b.title}`).join("|");
+}
+
+function findLatestIntakeTextAfterAnchor(
+  rows: ChatRow[],
+  anchorIdx: number,
+  streaming: string,
+): string {
+  const live = streaming.trim();
+  if (live) {
+    const liveIntake = extractIntakeOnlyText(live);
+    if (parseQuestionBlocks(liveIntake).length > 0) return liveIntake;
+  }
+  for (let i = rows.length - 1; i > anchorIdx; i--) {
+    const r = rows[i]!;
+    if (String(r.role).toLowerCase() !== "assistant") continue;
+    const intakeOnly = extractIntakeOnlyText(r.text);
+    if (parseQuestionBlocks(intakeOnly).length > 0) return intakeOnly;
+    break;
+  }
+  return "";
 }
 
 function extractAgentStreamHint(payload: unknown): string | null {
@@ -657,6 +831,7 @@ function extractThinkingDelta(payload: unknown): string | null {
 const THREADS_LS = "gw.chat.threads";
 const ACTIVE_THREAD_LS = "gw.chat.activeThreadId";
 const DEVICE_ID_LS = "gw.deviceId";
+const TESTER_LABEL_LS = "gw.testerLabel";
 /** 递增后下次打开会清空本机侧栏历史（仅 localStorage，不删服务器上其它 session） */
 const STORAGE_SCHEMA_LS = "gw.storageSchema";
 const STORAGE_SCHEMA_VERSION = 3;
@@ -672,6 +847,28 @@ function getOrCreateDeviceId(): string {
   } catch {
     return "dev-anonymous";
   }
+}
+
+/** 评测者标识：URL ?tester=张三 写入 localStorage，eval 日志按此区分不同测试者 */
+function resolveTesterLabel(): string | null {
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get("tester")?.trim();
+    if (fromUrl) {
+      localStorage.setItem(TESTER_LABEL_LS, fromUrl);
+      return fromUrl;
+    }
+    return localStorage.getItem(TESTER_LABEL_LS)?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function modelLabelForId(
+  modelId: string | undefined,
+  models: Array<{ id: string; label: string }>,
+): string {
+  if (!modelId) return "";
+  return models.find((m) => m.id === modelId)?.label || modelId;
 }
 
 function migrateLocalChatStorage(): void {
@@ -697,6 +894,8 @@ type ChatThread = {
   sessionKey: string;
   title: string;
   updatedAt: number;
+  /** 新建会话时快照的全局 modelId */
+  modelId?: string;
 };
 
 function loadThreads(): ChatThread[] {
@@ -714,6 +913,7 @@ function loadThreads(): ChatThread[] {
         sessionKey: (o.sessionKey as string).trim(),
         title: typeof o.title === "string" ? o.title : "对话",
         updatedAt: typeof o.updatedAt === "number" ? o.updatedAt : Date.now(),
+        modelId: typeof o.modelId === "string" ? o.modelId : undefined,
       }))
       .filter((t) => t.sessionKey.length > 0);
   } catch {
@@ -1031,6 +1231,32 @@ const compactUi = import.meta.env.VITE_COMPACT_UI === "true";
 const autoConnect = import.meta.env.VITE_AUTO_CONNECT === "true";
 const showDebug = import.meta.env.VITE_SHOW_DEBUG === "true";
 
+const TASK_ID_RE = /\b(T063_\d{3}|task_0\d{2})\b/i;
+
+function parseTaskIdFromText(text: string): string | null {
+  const m = text.match(TASK_ID_RE);
+  if (!m) return null;
+  const raw = m[1]!.toUpperCase();
+  if (raw.startsWith("TASK_")) return `T063_${raw.slice(5)}`;
+  return raw;
+}
+
+function stripEvalTaskTag(text: string): { text: string; taskId: string | null } {
+  const taskId = parseTaskIdFromText(text);
+  if (!taskId) return { text, taskId: null };
+  const cleaned = text.replace(new RegExp(`\\[?${taskId}\\]?\\s*`, "i"), "").trim();
+  return { text: cleaned || text, taskId };
+}
+
+function evalTaskIdFromUrl(): string | null {
+  try {
+    const q = new URLSearchParams(window.location.search).get("eval_task");
+    return q ? parseTaskIdFromText(q) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** 紧凑模式：不向用户展示连接状态文案（避免「连接中」闪动）。 */
 function userFacingStatus(raw: string, _connected: boolean): string {
   if (compactUi) return "";
@@ -1048,6 +1274,10 @@ export default function App() {
   const [log, setLog] = useState<string[]>([]);
   const [rows, setRows] = useState<ChatRow[]>([]);
   const [draft, setDraft] = useState("");
+  /** Send 瞬间展示的用户气泡（防 history 刷新覆盖 rows 时对话区空白） */
+  const [pendingUserDisplay, setPendingUserDisplay] = useState<{ id: string; text: string } | null>(
+    null,
+  );
   const [streaming, setStreaming] = useState("");
   const [toolSteps, setToolSteps] = useState<ProcessStep[]>([]);
   const [awaitingAgent, setAwaitingAgent] = useState(false);
@@ -1057,9 +1287,13 @@ export default function App() {
   const [intakeFollowUp, setIntakeFollowUp] = useState<Record<number, string>>({});
   const [frozenIntake, setFrozenIntake] = useState<IntakeBlock[] | null>(null);
   const [frozenIntakeIntro, setFrozenIntakeIntro] = useState("");
-  const [intakeFocusQ, setIntakeFocusQ] = useState<number | null>(null);
   const [intakeSubmitted, setIntakeSubmitted] = useState(false);
+  const [intakeViaFreetext, setIntakeViaFreetext] = useState(false);
   const [submittedIntake, setSubmittedIntake] = useState<IntakeSubmittedSnapshot | null>(null);
+  /** 整趟换纲后 Agent 再出选择题：解锁 intake，展示新问卷 */
+  const [intakeUnlockedForNewTrip, setIntakeUnlockedForNewTrip] = useState(false);
+  const [supersededIntake, setSupersededIntake] = useState<IntakeSubmittedSnapshot | null>(null);
+  const intakeUnlockAppliedRef = useRef("");
   const [intakeAnchorUserId, setIntakeAnchorUserId] = useState<string | null>(null);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string>("");
@@ -1080,14 +1314,17 @@ export default function App() {
   const seenToolsThisRunRef = useRef<Set<string>>(new Set());
   const ackFlushedThisRunRef = useRef(false);
   const ackTextThisRunRef = useRef("");
+  const intakeViaFreetextRef = useRef(false);
+  const skipIntakeAckIdRef = useRef<string | null>(null);
   const toolStartedThisRunRef = useRef(false);
   const tryEarlyFlushAckRef = useRef<() => void>(() => {});
   const itineraryImageAbortRef = useRef<AbortController | null>(null);
   const itineraryImageJobIdRef = useRef<string | null>(null);
   const lastImagePlanFpRef = useRef("");
+  const imageGenSuppressedRef = useRef(false);
   const maybeStartItineraryImageRef = useRef<(planText: string) => void>(() => {});
   const tryTriggerItineraryImageFromRowsRef = useRef<() => void>(() => {});
-  const cancelItineraryImageGenRef = useRef<() => void>(() => {});
+  const cancelItineraryImageGenRef = useRef<(opts?: { userFollowUp?: boolean }) => void>(() => {});
   const softReconnectRef = useRef(false);
   const [imageGenPending, setImageGenPending] = useState(false);
   const imageGenPendingRef = useRef(false);
@@ -1098,6 +1335,23 @@ export default function App() {
     async () => {},
   );
   const stopHistoryPollRef = useRef<() => void>(() => {});
+
+  // ===== 时序评测：本轮计时 =====
+  type TurnTiming = {
+    sendTime: number;
+    firstTextTime: number | null;
+    firstToolTime: number | null;
+    endTime: number | null;
+    toolCalls: Array<{ name: string; startTime: number; endTime?: number; ok?: boolean; error?: string }>;
+  };
+  const turnTimingRef = useRef<TurnTiming | null>(null);
+  const activeToolsRef = useRef<Map<string, number>>(new Map());
+  const evalTurnIndexRef = useRef(0);
+  const evalTaskIdRef = useRef<string | null>(evalTaskIdFromUrl());
+  const intakeShownLoggedRef = useRef(false);
+  const imageGenStartRef = useRef<number | null>(null);
+  // ===== 时序评测结束 =====
+
   const streamScrollRef = useRef<HTMLDivElement | null>(null);
   const streamPinnedToBottomRef = useRef(true);
   const processLogRef = useRef<HTMLDivElement | null>(null);
@@ -1114,20 +1368,92 @@ export default function App() {
   const [locationBusy, setLocationBusy] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [locationRefreshFailed, setLocationRefreshFailed] = useState(false);
-  const locationInjectedSessions = useRef<Set<string>>(new Set());
-  const locationInjectInFlightRef = useRef<Map<string, Promise<boolean>>>(new Map());
+  const lastInjectedLocationKeyRef = useRef<Map<string, string>>(new Map());
   const locationRefreshInFlightRef = useRef(false);
   const warmupInFlightRef = useRef(false);
   const warmupDoneSessions = useRef<Set<string>>(new Set());
   const warmupPromiseRef = useRef<Promise<void> | null>(null);
   const warmupResolveRef = useRef<(() => void) | null>(null);
   const warmupStateRef = useRef<WarmupState>("idle");
+  const awaitingAgentRef = useRef(false);
+  const sessionKeyRef = useRef("");
   const finishWarmupRunRef = useRef<(sk: string) => void>(() => {});
   const startSessionWarmupRef = useRef<() => void>(() => {});
   const ensureWarmupCompleteRef = useRef<(timeoutMs?: number) => Promise<void>>(async () => {});
 
   const appEnabled = locationConsent === "granted";
   const showLocationConsent = locationConsent === "pending";
+
+  // ── Model selector state ──
+  const [availableModels, setAvailableModels] = useState<Array<{ id: string; label: string }>>([]);
+  const [currentModelId, setCurrentModelId] = useState("doubao-seed-2.0-code");
+  const currentModelIdRef = useRef(currentModelId);
+  const [modelSwitching, setModelSwitching] = useState(false);
+  const [modelSwitchMsg, setModelSwitchMsg] = useState("");
+  const [testerLabel, setTesterLabel] = useState<string | null>(() => resolveTesterLabel());
+  const deviceIdRef = useRef(getOrCreateDeviceId());
+
+  useEffect(() => {
+    currentModelIdRef.current = currentModelId;
+  }, [currentModelId]);
+
+  useEffect(() => {
+    setTesterLabel(resolveTesterLabel());
+  }, []);
+
+  const fetchModels = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/models");
+      const data = await resp.json();
+      if (data.ok) {
+        setAvailableModels(data.models || []);
+        if (data.current) setCurrentModelId(data.current);
+      }
+    } catch { /* ignore on first load */ }
+  }, []);
+
+  const handleSwitchModel = useCallback(async (modelId: string) => {
+    if (modelId === currentModelId || modelSwitching) return;
+    const fromModelId = currentModelId;
+    setModelSwitching(true);
+    setModelSwitchMsg("");
+    try {
+      const resp = await fetch("/api/switch-model", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model_id: modelId }),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        setCurrentModelId(modelId);
+        currentModelIdRef.current = modelId;
+        setModelSwitchMsg(`已切换至 ${availableModels.find(m => m.id === modelId)?.label || modelId}`);
+        setTimeout(() => setModelSwitchMsg(""), 3000);
+        const sk = sessionKeyRef.current.trim();
+        void fetch("/api/eval/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event: "model_switch",
+            sessionKey: sk || `meta:device:${deviceIdRef.current}`,
+            recordedAt: Date.now(),
+            modelId,
+            deviceId: deviceIdRef.current,
+            testerLabel,
+            payload: { fromModelId, toModelId: modelId },
+          }),
+        }).catch(() => {});
+      } else {
+        setModelSwitchMsg(`切换失败: ${data.error || "未知错误"}`);
+      }
+    } catch (e: any) {
+      setModelSwitchMsg(`切换失败: ${e.message || e}`);
+    } finally {
+      setModelSwitching(false);
+    }
+  }, [currentModelId, modelSwitching, availableModels, testerLabel]);
+
+  useEffect(() => { fetchModels(); }, [fetchModels]);
 
   const pushLog = useCallback((line: string) => {
     setLog((prev) => [...prev.slice(-80), `${new Date().toISOString().slice(11, 23)} ${line}`]);
@@ -1156,15 +1482,17 @@ export default function App() {
     [lastUserBubble],
   );
 
-  /** 问卷解析：仅 intake 阶段；提交后不再解析 plan/ack */
+  /** 问卷解析：仅 intake 阶段；提交后不再解析 plan/ack（换纲解锁后除外） */
   const intakeParseText = useMemo(() => {
-    if (intakeSubmitted || lastUserIsIntakeSubmission) return "";
+    if (!intakeUnlockedForNewTrip && (intakeSubmitted || lastUserIsIntakeSubmission || intakeViaFreetext)) {
+      return "";
+    }
 
     const live = streaming.trim();
     if (live) {
       const liveIntake = extractIntakeOnlyText(live);
       if (parseQuestionBlocks(liveIntake).length > 0) return liveIntake;
-      return "";
+      // 流式前导语阶段尚无 A/B/C：继续从 rows 解析，避免整段空窗
     }
 
     const anchorUserIdx = findCurrentTurnAnchorIdx(rows);
@@ -1179,7 +1507,7 @@ export default function App() {
       if (parseQuestionBlocks(intakeOnly).length > 0) return intakeOnly;
     }
     return "";
-  }, [rows, streaming, intakeSubmitted, lastUserIsIntakeSubmission]);
+  }, [rows, streaming, intakeSubmitted, lastUserIsIntakeSubmission, intakeUnlockedForNewTrip, intakeViaFreetext]);
 
   const intakeSurvey = useMemo(() => {
     const t = intakeParseText;
@@ -1198,17 +1526,58 @@ export default function App() {
 
   const turnSubmittedIntake = useMemo((): IntakeSubmittedSnapshot | null => {
     if (currentTurnAnchorIdx < 0) return null;
-    return buildTurnSubmittedIntake(rows, currentTurnAnchorIdx);
-  }, [rows, currentTurnAnchorIdx]);
+    const cardAnchorIdx = rows.findIndex(
+      (r) => r.id === (intakeAnchorUserId ?? findIntakeCardAnchorUserId(rows)),
+    );
+    const anchorIdx = cardAnchorIdx >= 0 ? cardAnchorIdx : currentTurnAnchorIdx;
+    return buildTurnIntakeSnapshot(rows, anchorIdx);
+  }, [rows, currentTurnAnchorIdx, intakeAnchorUserId]);
 
   const sessionPlanningIntake = useMemo(() => findSessionPlanningIntake(rows), [rows]);
 
+  /** 方案已交付后 Agent 再出新一轮选择题（整趟换纲）：解锁并展示新 IntakeCard */
   useEffect(() => {
-    if (turnSubmittedIntake || lastUserIsIntakeSubmission) return;
+    if (!sessionHasDeliveredPlan(rows)) return;
+    const anchorIdx = findCurrentTurnAnchorIdx(rows);
+    if (anchorIdx < 0) return;
+    if (isIntakeSubmissionText(rows[anchorIdx]!.text)) return;
+    if (!hasPlanBeforeAnchor(rows, anchorIdx)) return;
+
+    const newIntakeText = findLatestIntakeTextAfterAnchor(rows, anchorIdx, streaming);
+    if (!newIntakeText) return;
+    const newBlocks = parseQuestionBlocks(newIntakeText);
+    if (!newBlocks.length) return;
+
+    const prior = findSessionPlanningIntake(rows)?.snapshot;
+    if (!prior?.blocks.length) return;
+    const newFp = intakeBlocksFingerprint(newBlocks);
+    const oldFp = intakeBlocksFingerprint(prior.blocks);
+    if (newFp === oldFp) return;
+
+    const unlockKey = `${rows[anchorIdx]!.id}:${newFp}`;
+    if (intakeUnlockAppliedRef.current === unlockKey) return;
+    intakeUnlockAppliedRef.current = unlockKey;
+
+    setSupersededIntake(prior);
+    setIntakeUnlockedForNewTrip(true);
+    setIntakeSubmitted(false);
+    setIntakeViaFreetext(false);
+    setSubmittedIntake(null);
+    setIntakeSelections({});
+    setIntakeCustom({});
+    setIntakeFollowUp({});
+    setFrozenIntake(newBlocks);
+    if (newIntakeText) {
+      const survey = parseIntakeSurvey(newIntakeText);
+      if (survey.intro) setFrozenIntakeIntro(survey.intro);
+    }
+  }, [rows, streaming]);
+
+  useEffect(() => {
+    if (turnSubmittedIntake || lastUserIsIntakeSubmission || intakeSubmitted || intakeViaFreetext) return;
     if (currentTurnAnchorIdx < 0) {
       setFrozenIntake(null);
       setFrozenIntakeIntro("");
-      setIntakeFocusQ(null);
       return;
     }
     if (intakeBlocks.length > 0) {
@@ -1217,7 +1586,6 @@ export default function App() {
     } else if (!streaming.trim()) {
       setFrozenIntake(null);
       setFrozenIntakeIntro("");
-      setIntakeFocusQ(null);
     }
   }, [
     intakeBlocks,
@@ -1226,14 +1594,21 @@ export default function App() {
     streaming,
     lastUserIsIntakeSubmission,
     turnSubmittedIntake,
+    intakeSubmitted,
+    intakeViaFreetext,
   ]);
 
   const displayIntakeIntro = frozenIntakeIntro || intakeIntro;
 
-  const persistedIntakeSnapshot = sessionPlanningIntake?.snapshot ?? null;
+  const persistedIntakeSnapshot =
+    intakeUnlockedForNewTrip ? null : (sessionPlanningIntake?.snapshot ?? null);
   const effectiveSubmittedIntake =
-    turnSubmittedIntake ?? persistedIntakeSnapshot ?? (intakeSubmitted ? submittedIntake : null);
+    turnSubmittedIntake ??
+    persistedIntakeSnapshot ??
+    (intakeUnlockedForNewTrip ? null : intakeSubmitted ? submittedIntake : null);
   const intakeLocked = Boolean(effectiveSubmittedIntake) || lastUserIsIntakeSubmission;
+  const intakeSkippedViaFreetext =
+    intakeViaFreetext || (effectiveSubmittedIntake != null && turnSubmittedIntake == null && !lastUserIsIntakeSubmission);
 
   const displayIntakeBlocksResolved = useMemo(() => {
     if (intakeLocked && effectiveSubmittedIntake?.blocks.length) {
@@ -1254,18 +1629,144 @@ export default function App() {
     (displayIntakeBlocksResolved.length > 0 ||
       (!intakeLocked && hasIntakeQuestions(intakeParseText)));
 
+  /** 补槽未提交：隐藏过渡 assistant 气泡与工具进展（含 read/weather） */
+  const intakePhasePending = useMemo(() => {
+    if (intakeLocked || lastUserIsIntakeSubmission || intakeSkippedViaFreetext) return false;
+    const anchorIdx = findCurrentTurnAnchorIdx(rows);
+    if (anchorIdx < 0) return false;
+    if (hasPlanAfterAnchor(rows, anchorIdx)) return false;
+    if (displayIntakeBlocksResolved.length > 0) return true;
+    if (hasIntakeQuestions(intakeParseText)) return true;
+    // 用户已发规划首句、尚未出长文方案：一律只展示 IntakeCard（不必等 awaitingAgent）
+    return true;
+  }, [
+    displayIntakeBlocksResolved.length,
+    rows,
+    intakeLocked,
+    intakeParseText,
+    lastUserIsIntakeSubmission,
+    intakeSkippedViaFreetext,
+  ]);
+
   useEffect(() => {
-    const anchorId = findIntakeAnchorUserId(rows);
+    awaitingAgentRef.current = awaitingAgent;
+  }, [awaitingAgent]);
+
+  useEffect(() => {
+    sessionKeyRef.current = sessionKey.trim();
+  }, [sessionKey]);
+
+  const evalThreadMeta = useCallback(() => {
+    const t = threads.find((x) => x.id === activeThreadId);
+    const title = t?.title ?? "";
+    const taskId = evalTaskIdRef.current ?? parseTaskIdFromText(title);
+    return { threadTitle: title, taskId };
+  }, [threads, activeThreadId]);
+
+  const logEvalEvent = useCallback(
+    async (event: string, payload: Record<string, unknown> = {}) => {
+      const sk = sessionKeyRef.current.trim();
+      if (!sk) return;
+      const meta = evalThreadMeta();
+      const thread = threads.find((x) => x.id === activeThreadId);
+      const modelId =
+        (typeof payload.modelId === "string" ? payload.modelId : undefined) ||
+        thread?.modelId ||
+        currentModelIdRef.current;
+      const { modelId: _drop, ...restPayload } = payload;
+      try {
+        await fetch("/api/eval/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event,
+            sessionKey: sk,
+            recordedAt: Date.now(),
+            taskId: meta.taskId,
+            threadTitle: meta.threadTitle,
+            turnIndex: evalTurnIndexRef.current,
+            modelId,
+            deviceId: deviceIdRef.current,
+            testerLabel,
+            payload: { ...restPayload, modelId },
+          }),
+        });
+      } catch {
+        /* eval API 不可用时静默 */
+      }
+    },
+    [activeThreadId, evalThreadMeta, testerLabel, threads],
+  );
+
+  const intakeSubmittedLoggedRef = useRef(false);
+  const lastToolProgressCountRef = useRef(0);
+  const loggedProcessStepIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!showIntakeCard || intakeShownLoggedRef.current || displayIntakeBlocksResolved.length === 0) return;
+    intakeShownLoggedRef.current = true;
+    const tt = turnTimingRef.current;
+    void logEvalEvent("intake_shown", {
+      phase: "A",
+      blockCount: displayIntakeBlocksResolved.length,
+      ttftMs:
+        tt && tt.firstTextTime != null ? tt.firstTextTime - tt.sendTime : undefined,
+    });
+  }, [showIntakeCard, displayIntakeBlocksResolved.length, logEvalEvent]);
+
+  useEffect(() => {
+    if (!intakeLocked || !lastUserIsIntakeSubmission || intakeSubmittedLoggedRef.current) return;
+    intakeSubmittedLoggedRef.current = true;
+    void logEvalEvent("intake_submitted", { phase: "B" });
+  }, [intakeLocked, lastUserIsIntakeSubmission, logEvalEvent]);
+
+  /** 任务进展区每一行（含「开始执行本轮任务」、生图、发送态）写入 eval 日志 */
+  useEffect(() => {
+    if (toolSteps.length === 0) {
+      loggedProcessStepIdsRef.current.clear();
+      return;
+    }
+    toolSteps.forEach((s, idx) => {
+      if (loggedProcessStepIdsRef.current.has(s.id)) return;
+      loggedProcessStepIdsRef.current.add(s.id);
+      void logEvalEvent("process_step", {
+        stepId: s.id,
+        msg: s.msg,
+        clock: s.clock,
+        stepIndex: idx,
+      });
+    });
+  }, [toolSteps, logEvalEvent]);
+
+  useEffect(() => {
+    if (!intakeLocked) {
+      lastToolProgressCountRef.current = 0;
+      return;
+    }
+    const lifecareSteps = toolSteps.filter((s) =>
+      /天气|POI|路线|搜|规划|工具|加载|并行|MCP/i.test(s.msg),
+    );
+    if (lifecareSteps.length <= lastToolProgressCountRef.current) return;
+    const step = lifecareSteps[lifecareSteps.length - 1]!;
+    lastToolProgressCountRef.current = lifecareSteps.length;
+    void logEvalEvent("tool_progress", {
+      phase: "B",
+      label: step.msg,
+      stepCount: lifecareSteps.length,
+    });
+  }, [toolSteps, intakeLocked, logEvalEvent]);
+
+  useEffect(() => {
+    if (intakeSubmitted || intakeAnchorUserId) return;
+    const anchorId = findIntakeCardAnchorUserId(rows);
     if (anchorId) setIntakeAnchorUserId(anchorId);
-    else setIntakeAnchorUserId(null);
-  }, [rows]);
+  }, [rows, intakeSubmitted, intakeAnchorUserId]);
 
   useEffect(() => {
     if (!currentTurnAnchorId) return;
     setIntakeSelections({});
     setIntakeCustom({});
     setIntakeFollowUp({});
-    setIntakeFocusQ(null);
   }, [currentTurnAnchorId]);
 
   useEffect(() => {
@@ -1273,13 +1774,19 @@ export default function App() {
       setSubmittedIntake(turnSubmittedIntake);
       setIntakeSubmitted(true);
       setFrozenIntake(turnSubmittedIntake.blocks);
+      const cardAnchorId = intakeAnchorUserId ?? findIntakeCardAnchorUserId(rows);
+      const cardAnchorIdx = cardAnchorId ? rows.findIndex((r) => r.id === cardAnchorId) : -1;
+      const anchorIdx = cardAnchorIdx >= 0 ? cardAnchorIdx : currentTurnAnchorIdx;
+      if (anchorIdx >= 0 && !buildTurnSubmittedIntake(rows, anchorIdx)) {
+        setIntakeViaFreetext(true);
+      }
       return;
     }
-    if (!awaitingAgent) {
+    if (!awaitingAgent && !intakeViaFreetext) {
       setIntakeSubmitted(false);
       setSubmittedIntake(null);
     }
-  }, [turnSubmittedIntake, awaitingAgent]);
+  }, [turnSubmittedIntake, awaitingAgent, intakeViaFreetext, rows, intakeAnchorUserId, currentTurnAnchorIdx]);
 
   const canSubmitIntake = intakeAnswerComplete(
     frozenIntake ?? intakeBlocks,
@@ -1293,6 +1800,7 @@ export default function App() {
     const s = streaming.trim().replace(/\r\n/g, "\n");
     if (!s) return false;
     if (indexOfFirstVisibleUser(rows) < 0) return false;
+    if (intakePhasePending) return false;
     if (isIntakeQuestionBubble(s)) return false;
     const last = rows[rows.length - 1];
     if (last && String(last.role).toLowerCase() === "user") return true;
@@ -1309,21 +1817,94 @@ export default function App() {
     if (t.length >= s.length - 4 && s.length > 20 && t.startsWith(s)) return false;
     if (t.length > 400 && s.length > 400 && t.slice(0, 280) === s.slice(0, 280)) return false;
     return true;
-  }, [rows, streaming, showIntakeCard]);
+  }, [rows, streaming, showIntakeCard, intakePhasePending]);
 
   useEffect(() => {
     rowsRef.current = rows;
-  }, [rows]);
+    if (
+      pendingUserDisplay &&
+      rows.some(
+        (r) =>
+          isVisibleUserRow(r) &&
+          (r.id === pendingUserDisplay.id ||
+            extractUserVisibleTextFromMessage(r.text).trim() === pendingUserDisplay.text.trim()),
+      )
+    ) {
+      setPendingUserDisplay(null);
+    }
+  }, [rows, pendingUserDisplay]);
 
   useEffect(() => {
     streamingRef.current = streaming;
   }, [streaming]);
+
+  useEffect(() => {
+    intakeViaFreetextRef.current = intakeViaFreetext;
+  }, [intakeViaFreetext]);
+
+  const tryPinSkipIntakeEntryAck = useCallback(() => {
+    if (!intakeViaFreetextRef.current) return;
+    const stream = streamingRef.current.trim();
+    const split = extractPinnedSkipIntakeEntryAck(stream);
+    if (!split) return;
+
+    const id = skipIntakeAckIdRef.current ?? `a-skip-intake-ack-${Date.now().toString(36)}`;
+    skipIntakeAckIdRef.current = id;
+
+    setRows((prev) => {
+      const existingIdx = prev.findIndex((r) => r.id === id);
+      const row: ChatRow = { role: "assistant", text: split.ack, id };
+      if (existingIdx >= 0) {
+        if (prev[existingIdx]!.text === split.ack) return prev;
+        const next = [...prev];
+        next[existingIdx] = row;
+        rowsRef.current = next;
+        return next;
+      }
+      const next = [...prev, row];
+      rowsRef.current = next;
+      return next;
+    });
+
+    if (split.remainder) {
+      streamingRef.current = split.remainder;
+      setStreaming(split.remainder);
+      return;
+    }
+    if (stream === split.ack || (split.ack.length > 40 && stream.startsWith(split.ack.slice(0, 40)))) {
+      streamingRef.current = "";
+      setStreaming("");
+    }
+  }, []);
+
+  const tryPinSkipIntakeEntryAckRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    tryPinSkipIntakeEntryAckRef.current = tryPinSkipIntakeEntryAck;
+  }, [tryPinSkipIntakeEntryAck]);
 
   const tryEarlyFlushAck = useCallback(() => {
     if (ackFlushedThisRunRef.current) return;
     const stream = streamingRef.current.trim();
     if (!stream || isEmptyAssistantPlaceholder(stream) || isPlanMessage(stream)) return;
     if (!shouldEarlyFlushAck(stream)) return;
+    // 行程规划场景：流式文本含选择题特征时不提前 flush ack，
+    // 否则 ack 被 flush 后又被 intake 处理逻辑"吃掉"造成闪动
+    if (isIntakeQuestionText(stream)) return;
+    if (isSkipIntakeEntryAck(stream)) {
+      tryPinSkipIntakeEntryAckRef.current();
+      return;
+    }
+    // B 阶段 / 已提交过选择题 / 追问轮：ack 只走任务进展，不进对话区闪泡
+    if (
+      shouldSkipEarlyFlushAckForPlanPhase(rowsRef.current, optimisticUserRef.current, {
+        toolStarted: toolStartedThisRunRef.current,
+        hadSearch: hadSearchPlacesRef.current,
+        historyHadSearch: historyHadSearchRef.current,
+        intakeViaFreetext: intakeViaFreetextRef.current,
+      })
+    ) {
+      return;
+    }
 
     ackFlushedThisRunRef.current = true;
     ackTextThisRunRef.current = stream;
@@ -1340,16 +1921,67 @@ export default function App() {
 
   /** 用户首条可见消息前：不展示任务进展明细（预热等后台步骤对用户不可见） */
   const hasVisibleUserMessage = useMemo(() => indexOfFirstVisibleUser(rows) >= 0, [rows]);
-  const visibleToolSteps = hasVisibleUserMessage ? toolSteps : [];
+  /** 选择题未提交阶段（IntakeCard 可交互） */
+  const intakeActive =
+    showIntakeCard && !intakeLocked && displayIntakeBlocksResolved.length > 0;
+  /** 补槽 A 阶段：过滤 lifecare 主工具，保留带时间戳的高层进展 */
+  const suppressToolProgress = intakePhasePending;
+  const visibleToolSteps = useMemo(() => {
+    if (!hasVisibleUserMessage) return [];
+    if (suppressToolProgress) return filterIntakePhaseToolSteps(toolSteps);
+    return toolSteps;
+  }, [hasVisibleUserMessage, suppressToolProgress, toolSteps]);
+
+  /** A 阶段已发 user、问卷尚未挂载：对话区展示加载态（避免 read 后 10～20s 全黑） */
+  const showIntakeLoading = useMemo(
+    () =>
+      intakePhasePending &&
+      !showIntakeCard &&
+      !intakeSkippedViaFreetext &&
+      !intakeLocked &&
+      hasVisibleUserMessage &&
+      (awaitingAgent || visibleToolSteps.length > 0),
+    [
+      intakePhasePending,
+      showIntakeCard,
+      intakeSkippedViaFreetext,
+      intakeLocked,
+      hasVisibleUserMessage,
+      awaitingAgent,
+      visibleToolSteps.length,
+    ],
+  );
+
+  const pinnedSkipIntakeAck = useMemo(() => {
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const r = rows[i]!;
+      if (String(r.role).toLowerCase() !== "assistant") continue;
+      if (isSkipIntakeEntryAck(r.text)) return r.text.trim();
+    }
+    return "";
+  }, [rows]);
 
   const liveStreamText = useMemo(
-    () =>
-      liveStreamDisplayText(
+    () => {
+      // 与 tryEarlyFlushAck 同一判定：B 阶段/追问轮纯 ack 不在对话区闪现
+      const suppressAck = shouldSkipEarlyFlushAckForPlanPhase(
+        rowsRef.current,
+        optimisticUserRef.current,
+        {
+          toolStarted: toolStartedThisRunRef.current,
+          hadSearch: hadSearchPlacesRef.current,
+          historyHadSearch: historyHadSearchRef.current,
+        },
+      );
+      return liveStreamDisplayText(
         streaming,
         ackTextThisRunRef.current,
         ackFlushedThisRunRef.current,
-      ),
-    [streaming, ackFlushedTick],
+        pinnedSkipIntakeAck || undefined,
+        suppressAck,
+      );
+    },
+    [streaming, ackFlushedTick, pinnedSkipIntakeAck],
   );
 
   useEffect(() => {
@@ -1384,6 +2016,10 @@ export default function App() {
 
   useEffect(() => {
     if (!awaitingAgent || !lastUserBubble) return;
+    // B 阶段（口语跳过 / 已提交选择题）：不在首条非 intake 文本时结束 awaiting，等 chat.final
+    if (intakeViaFreetextRef.current || intakeLocked) {
+      return;
+    }
     const userIdx = rows.findIndex((r) => r.id === lastUserBubble.id);
     if (userIdx < 0) return;
     for (let i = rows.length - 1; i > userIdx; i--) {
@@ -1398,7 +2034,7 @@ export default function App() {
     if (live.length > 12 && !isIntakeQuestionBubble(live)) {
       setAwaitingAgent(false);
     }
-  }, [rows, streaming, awaitingAgent, lastUserBubble]);
+  }, [rows, streaming, awaitingAgent, lastUserBubble, intakeLocked]);
 
   useEffect(() => {
     if (threadsBootstrapped.current) return;
@@ -1438,6 +2074,34 @@ export default function App() {
       historyPollTimerRef.current = null;
     }
   }, []);
+
+  /** 切线程 / 新建会话：abort + unsubscribe 旧 session，丢弃在途 history/WS */
+  const detachInactiveSession = useCallback(
+    async (oldSk: string) => {
+      const sk = oldSk.trim();
+      if (!sk) return;
+      stopHistoryPoll();
+      historyLoadGen.current += 1;
+      cancelItineraryImageGenRef.current();
+      turnTimingRef.current = null;
+      optimisticUserRef.current = null;
+      streamingRef.current = "";
+      setStreaming("");
+      const c = clientRef.current;
+      if (!c?.connected) return;
+      try {
+        await c.request("chat.abort", { sessionKey: sk });
+      } catch {
+        /* ignore */
+      }
+      try {
+        await c.request("sessions.messages.unsubscribe", { sessionKey: sk });
+      } catch {
+        /* ignore */
+      }
+    },
+    [stopHistoryPoll],
+  );
 
   const persistSettings = useCallback(() => {
     localStorage.setItem("gw.url", gatewayUrl);
@@ -1488,21 +2152,50 @@ export default function App() {
       try {
         const data = await c.request("chat.history", { sessionKey: sk });
         if (loadGen !== historyLoadGen.current) return;
+        if (sessionKeyRef.current.trim() !== sk) return;
         if (historyDataUsedSearchPlaces(data)) {
           historyHadSearchRef.current = true;
           hadSearchPlacesRef.current = true;
         }
         const { sessionKey: skCanon, rows: serverRows } = extractHistoryRows(data);
+        if (skCanon && skCanon !== sk) return;
         const pending = optimisticUserRef.current;
         setRows((prev) => {
           if (loadGen !== historyLoadGen.current) return prev;
-          const sameSession = lastHistorySessionRef.current === sk;
+          if (sessionKeyRef.current.trim() !== sk) return prev;
+          const sameSession = sessionKeyRef.current.trim() === sk;
           const basePrev = sameSession ? prev : [];
           let merged = reconcileChatRows(basePrev, serverRows, { pendingUserText: pending });
+          // ===== 时序评测：保留本地 timing 字段，不被 server 数据覆盖 =====
+          if (basePrev.length > 0) {
+            merged = merged.map((row) => {
+              const prevRow = basePrev.find(
+                (pr) => pr.id === row.id || (pr.role === row.role && pr.text === row.text),
+              );
+              if (prevRow && (prevRow.timestamp || prevRow.ttftMs || prevRow.durationMs)) {
+                return {
+                  ...row,
+                  timestamp: prevRow.timestamp,
+                  ttftMs: prevRow.ttftMs,
+                  durationMs: prevRow.durationMs,
+                  firstToolMs: prevRow.firstToolMs,
+                  toolCalls: prevRow.toolCalls,
+                };
+              }
+              return row;
+            });
+          }
+          // ===== 时序评测结束 =====
           merged = appendPersistedItineraryImage(sk, merged);
           if (pending && serverRows.length > 0) {
             const lu = lastUserTextInRows(serverRows);
             if (lu != null && lu.trim() === pending.trim()) optimisticUserRef.current = null;
+          }
+          if (
+            merged.length === prev.length &&
+            rowsStableSignature(merged) === rowsStableSignature(prev)
+          ) {
+            return prev;
           }
           rowsRef.current = merged;
           const stream = streamingRef.current.trim();
@@ -1537,7 +2230,9 @@ export default function App() {
       } finally {
         if (loadGen === historyLoadGen.current) {
           setHistoryLoading(false);
-          window.setTimeout(() => tryTriggerItineraryImageFromRowsRef.current(), 80);
+          if (!awaitingAgentRef.current && !imageGenSuppressedRef.current) {
+            window.setTimeout(() => tryTriggerItineraryImageFromRowsRef.current(), 80);
+          }
         }
       }
     },
@@ -1559,6 +2254,7 @@ export default function App() {
     for (let i = snapshot.length - 1; i >= 0; i--) {
       const r = snapshot[i]!;
       if (String(r.role).toLowerCase() !== "assistant") continue;
+      if (hasVisibleUserAfterRowIndex(snapshot, i)) return;
       const repaired = await requestHarnessRepair(sk, r.text);
       if (!repaired || repaired.skipped || repaired.text === r.text) return;
       setRows((prev) => {
@@ -1566,6 +2262,7 @@ export default function App() {
         if (idx < 0) return prev;
         const next = [...prev];
         next[idx] = { ...next[idx]!, text: repaired.text };
+        if (rowsStableSignature(next) === rowsStableSignature(prev)) return prev;
         rowsRef.current = next;
         return next;
       });
@@ -1575,13 +2272,39 @@ export default function App() {
 
   const flushStreamingIntoRows = useCallback(() => {
     const streamBuf = stripLeadingAssistantPlaceholders(streamingRef.current.trim());
-    if (!streamBuf || isEmptyAssistantPlaceholder(streamBuf)) return;
+    if (!streamBuf || isEmptyAssistantPlaceholder(streamBuf) || isLocationBootstrapGreeting(streamBuf)) return;
     setRows((prev) => {
       const last = prev[prev.length - 1];
       if (last && String(last.role).toLowerCase() === "assistant" && last.text === streamBuf) {
         return prev;
       }
-      const next = [...prev, { role: "assistant", text: streamBuf, id: `a-flush-${Date.now().toString(36)}` }];
+      // ===== 时序评测：构建含 timing 的 assistant ChatRow =====
+      const tt = turnTimingRef.current;
+      const now = Date.now();
+      const assistantRow: ChatRow = {
+        role: "assistant",
+        text: streamBuf,
+        id: `a-flush-${now.toString(36)}`,
+        timestamp: now,
+        ...(tt
+          ? {
+              ttftMs: tt.firstTextTime != null ? tt.firstTextTime - tt.sendTime : undefined,
+              durationMs: tt.endTime != null ? tt.endTime - tt.sendTime : undefined,
+              firstToolMs: tt.firstToolTime != null ? tt.firstToolTime - tt.sendTime : undefined,
+              toolCalls:
+                tt.toolCalls.length > 0
+                  ? tt.toolCalls.map((tc) => ({
+                      name: tc.name,
+                      durationMs: tc.endTime != null ? tc.endTime - tc.startTime : undefined,
+                      ok: tc.ok,
+                      error: tc.error,
+                    }))
+                  : undefined,
+            }
+          : {}),
+      };
+      const next = [...prev, assistantRow];
+      // ===== 时序评测结束 =====
       rowsRef.current = next;
       return next;
     });
@@ -1594,12 +2317,60 @@ export default function App() {
     flushStreamingIntoRowsRef.current = flushStreamingIntoRows;
   }, [flushStreamingIntoRows]);
 
-  const cancelItineraryImageGen = useCallback(() => {
+  // ===== 时序评测：持久化本轮日志 =====
+  async function persistTurnLog(sk: string, userRow: ChatRow, assistantRow: ChatRow) {
+    const isIntake = hasIntakeQuestions(extractIntakeOnlyText(assistantRow.text));
+    const phase = isIntake ? "A" : intakeLocked ? "B" : "other";
+    try {
+      await fetch("/api/eval/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionKey: sk,
+          user: { text: userRow.text.slice(0, 2000), timestamp: userRow.timestamp },
+          assistant: {
+            text: assistantRow.text.slice(0, 2000),
+            timestamp: assistantRow.timestamp,
+            ttftMs: assistantRow.ttftMs,
+            durationMs: assistantRow.durationMs,
+            firstToolMs: assistantRow.firstToolMs,
+            toolCalls: assistantRow.toolCalls,
+          },
+          recordedAt: Date.now(),
+        }),
+      });
+    } catch {
+      /* legacy endpoint */
+    }
+    void logEvalEvent("turn_complete", {
+      phase,
+      isIntakeQuestion: isIntake,
+      isPlan: isPlanMessage(assistantRow.text),
+      user: { text: userRow.text.slice(0, 500), timestamp: userRow.timestamp },
+      assistant: {
+        text: assistantRow.text.slice(0, 800),
+        timestamp: assistantRow.timestamp,
+        ttftMs: assistantRow.ttftMs,
+        durationMs: assistantRow.durationMs,
+        firstToolMs: assistantRow.firstToolMs,
+        toolCalls: assistantRow.toolCalls,
+      },
+    });
+  }
+  // ===== 时序评测结束 =====
+
+  const cancelItineraryImageGen = useCallback((opts?: { userFollowUp?: boolean }) => {
     itineraryImageAbortRef.current?.abort();
     itineraryImageAbortRef.current = null;
     const jobId = itineraryImageJobIdRef.current;
     itineraryImageJobIdRef.current = null;
     if (jobId) void cancelItineraryImageJob(jobId);
+    if (opts?.userFollowUp) {
+      imageGenSuppressedRef.current = true;
+      const planText = findLongestPlanText(rowsRef.current, ackTextThisRunRef.current);
+      if (planText) lastImagePlanFpRef.current = planTextFingerprint(planText);
+      clearPersistedItineraryImage(sessionKeyRef.current.trim());
+    }
     setImageGenPending(false);
   }, []);
 
@@ -1610,7 +2381,10 @@ export default function App() {
   const maybeStartItineraryImage = useCallback(
     (planText: string) => {
       if (!appEnabled) return;
+      if (imageGenSuppressedRef.current) return;
+      if (awaitingAgentRef.current) return;
       if (indexOfFirstVisibleUser(rowsRef.current) < 0) return;
+      if (!shouldAllowItineraryImageForRows(rowsRef.current)) return;
       const text = planText.trim();
       if (!text || isNoiseAssistantBubble(text)) return;
       if (!isCompleteItineraryPlan(text, hadSearchPlacesRef.current)) return;
@@ -1626,24 +2400,43 @@ export default function App() {
       itineraryImageAbortRef.current = ac;
       setImageGenPending(true);
       setToolSteps((p) => appendProcessStep(p, "正在绘制行程一览图（长文已就绪，约需 1 分钟）…"));
+      imageGenStartRef.current = Date.now();
+      void logEvalEvent("image_gen_start", { planChars: text.length });
 
       void (async () => {
         try {
           const result = await requestItineraryImage(text, jobId, ac.signal);
           if (ac.signal.aborted || (!result.ok && "cancelled" in result && result.cancelled)) {
             setToolSteps((p) => appendProcessStep(p, "行程图已取消（您开始了新对话）"));
+            void logEvalEvent("image_gen_complete", { ok: false, cancelled: true });
             return;
           }
           if (!result.ok || !("image_url" in result)) {
             pushLog(
               `itinerary-image failed: ${"error" in result ? result.error : "unknown"}`,
             );
+            void logEvalEvent("image_gen_complete", {
+              ok: false,
+              durationMs: imageGenStartRef.current ? Date.now() - imageGenStartRef.current : undefined,
+            });
+            return;
+          }
+          if (
+            imageGenSuppressedRef.current ||
+            !shouldAllowItineraryImageForRows(rowsRef.current)
+          ) {
+            void logEvalEvent("image_gen_complete", {
+              ok: false,
+              suppressed: true,
+              durationMs: imageGenStartRef.current ? Date.now() - imageGenStartRef.current : undefined,
+            });
             return;
           }
           const md = formatItineraryImageMarkdown(result.image_url);
           const imgRow: ChatRow = { role: "assistant", text: md, id: `a-img-${Date.now().toString(36)}` };
           persistItineraryImageRow(sessionKey.trim(), fp, imgRow);
           setRows((prev) => {
+            if (!shouldAllowItineraryImageForRows(prev)) return prev;
             const last = prev[prev.length - 1];
             if (last && String(last.role).toLowerCase() === "assistant" && last.text === md) return prev;
             const next = [...prev, imgRow];
@@ -1651,6 +2444,10 @@ export default function App() {
             return next;
           });
           setToolSteps((p) => appendProcessStep(p, "行程一览图已生成"));
+          void logEvalEvent("image_gen_complete", {
+            ok: true,
+            durationMs: imageGenStartRef.current ? Date.now() - imageGenStartRef.current : undefined,
+          });
         } catch (e) {
           if (ac.signal.aborted) {
             setToolSteps((p) => appendProcessStep(p, "行程图已取消（您开始了新对话）"));
@@ -1666,7 +2463,7 @@ export default function App() {
         }
       })();
     },
-    [appEnabled, cancelItineraryImageGen, pushLog, sessionKey],
+    [appEnabled, cancelItineraryImageGen, logEvalEvent, pushLog, sessionKey],
   );
 
   useEffect(() => {
@@ -1679,9 +2476,12 @@ export default function App() {
 
   const tryTriggerItineraryImageFromRows = useCallback(() => {
     if (!appEnabled) return;
+    if (imageGenSuppressedRef.current) return;
+    if (awaitingAgentRef.current) return;
     if (indexOfFirstVisibleUser(rowsRef.current) < 0) return;
     if (streamingRef.current.trim()) return;
     if (imageGenPendingRef.current || itineraryImageJobIdRef.current) return;
+    if (!shouldAllowItineraryImageForRows(rowsRef.current)) return;
     const snapshot = rowsRef.current;
     if (rowsHasItineraryImage(snapshot)) return;
     if (sessionHasPersistedItineraryImage(sessionKey.trim())) return;
@@ -1840,11 +2640,28 @@ export default function App() {
         }
       },
       onEvent: (evt: GatewayEventFrame) => {
+        const activeSk = sessionKeyRef.current.trim();
+        if (!eventMatchesActiveSession(evt.payload, activeSk)) return;
         const noteToolStart = (payload: unknown) => {
           const raw = JSON.stringify(payload ?? "");
           if (/lifecare__|tool|mcp/i.test(raw)) {
             toolStartedThisRunRef.current = true;
-            queueMicrotask(() => tryEarlyFlushAckRef.current());
+            // ===== 时序评测：记录工具调用 =====
+            const tt = turnTimingRef.current;
+            if (tt) {
+              if (tt.firstToolTime === null) {
+                tt.firstToolTime = Date.now();
+              }
+              const toolName = extractToolName(payload);
+              if (toolName && !activeToolsRef.current.has(toolName)) {
+                activeToolsRef.current.set(toolName, Date.now());
+              }
+            }
+            // ===== 时序评测结束 =====
+            queueMicrotask(() => {
+              tryPinSkipIntakeEntryAckRef.current();
+              tryEarlyFlushAckRef.current();
+            });
           }
         };
         const appendStream = (payload: unknown) => {
@@ -1858,13 +2675,26 @@ export default function App() {
             }
           }
           if (piece) {
+            // ===== 时序评测：首次收到 assistant 文本时记录 TTFT =====
+            const tt = turnTimingRef.current;
+            if (tt && tt.firstTextTime === null) {
+              tt.firstTextTime = Date.now();
+            }
+            // ===== 时序评测结束 =====
             setStreaming((prev) => {
               let n = mergeStreamText(prev, piece);
               n = stripLeadingAssistantPlaceholders(n);
+              if (isLocationBootstrapGreeting(n)) {
+                streamingRef.current = "";
+                return "";
+              }
               streamingRef.current = n;
               return n;
             });
-            queueMicrotask(() => tryEarlyFlushAckRef.current());
+            queueMicrotask(() => {
+              tryPinSkipIntakeEntryAckRef.current();
+              tryEarlyFlushAckRef.current();
+            });
           }
         };
         if (evt.event === "chat" || evt.event === "session.message") {
@@ -1884,15 +2714,57 @@ export default function App() {
               void refreshHistoryRef.current({ keepOnEmpty: true });
               return;
             }
+            // ===== 时序评测：记录本轮结束时间 =====
+            const tt = turnTimingRef.current;
+            if (tt && tt.endTime === null) {
+              tt.endTime = Date.now();
+              // 结算所有未完成的工具调用
+              for (const [name, startTime] of activeToolsRef.current.entries()) {
+                tt.toolCalls.push({ name, startTime, endTime: Date.now() });
+              }
+            }
+            // ===== 时序评测结束 =====
             flushStreamingIntoRowsRef.current();
             if (chatState === "final") {
-              window.setTimeout(() => tryTriggerItineraryImageFromRowsRef.current(), 80);
+              window.setTimeout(() => {
+                const snap = rowsRef.current;
+                for (let i = snap.length - 1; i >= 0; i--) {
+                  const r = snap[i]!;
+                  if (String(r.role).toLowerCase() !== "assistant") continue;
+                  if (isPlanMessage(r.text) && shouldAllowItineraryImageForRows(snap)) {
+                    imageGenSuppressedRef.current = false;
+                  }
+                  break;
+                }
+                if (!awaitingAgentRef.current && !imageGenSuppressedRef.current) {
+                  tryTriggerItineraryImageFromRowsRef.current();
+                }
+              }, 80);
             }
             toolStartedThisRunRef.current = false;
             setAckFlushedTick((t) => t + 1);
             setAwaitingAgent(false);
             stopHistoryPollRef.current();
             void refreshHistoryRef.current({ keepOnEmpty: true });
+            // ===== 时序评测：延迟持久化，等 rows 更新完成 =====
+            if (tt) {
+              const sk = sessionKey.trim();
+              window.setTimeout(() => {
+                const snapshot = rowsRef.current;
+                let lastUser: ChatRow | undefined;
+                let lastAssistant: ChatRow | undefined;
+                for (let i = snapshot.length - 1; i >= 0; i--) {
+                  const r = snapshot[i]!;
+                  if (!lastAssistant && String(r.role).toLowerCase() === "assistant") lastAssistant = r;
+                  if (!lastUser && String(r.role).toLowerCase() === "user") { lastUser = r; break; }
+                }
+                if (lastUser && lastAssistant) {
+                  void persistTurnLog(sk, lastUser, lastAssistant);
+                }
+                turnTimingRef.current = null;
+              }, 200);
+            }
+            // ===== 时序评测结束 =====
             return;
           }
           appendStream(evt.payload);
@@ -2084,162 +2956,48 @@ export default function App() {
     disconnect();
   }, [disconnect]);
 
-  const sendHiddenContextMessage = useCallback(
-    async (text: string) => {
-      const c = clientRef.current;
-      if (!c?.connected || !sessionKey.trim()) return false;
-      const idem = newIdempotencyKey();
-      try {
-        await c.request("chat.send", {
-          sessionKey: sessionKey.trim(),
-          message: text,
-          idempotencyKey: idem,
-        });
-        pushLog("location context injected (hidden)");
-        return true;
-      } catch (e) {
-        pushLog(`location inject failed: ${formatRpcError(e)}`);
-        return false;
-      }
-    },
-    [pushLog, sessionKey],
-  );
-
-  const finishWarmupRun = useCallback((sk: string) => {
-    if (!warmupInFlightRef.current && !warmupResolveRef.current) return;
-    warmupInFlightRef.current = false;
+  const markWarmupDone = useCallback((sk: string) => {
+    if (!sk) return;
+    warmupDoneSessions.current.add(sk);
     warmupStateRef.current = "done";
-    if (sk) warmupDoneSessions.current.add(sk);
-    setStreaming("");
-    streamingRef.current = "";
-    setToolSteps([]);
+    warmupInFlightRef.current = false;
+    warmupPromiseRef.current = null;
     warmupResolveRef.current?.();
     warmupResolveRef.current = null;
-    warmupPromiseRef.current = null;
   }, []);
-
-  useEffect(() => {
-    finishWarmupRunRef.current = finishWarmupRun;
-  }, [finishWarmupRun]);
 
   const startSessionWarmup = useCallback(async () => {
     const sk = sessionKey.trim();
-    if (!sk || !appEnabled || !clientRef.current?.connected) return;
-    if (warmupDoneSessions.current.has(sk)) return;
-    if (warmupInFlightRef.current) return;
-    if (indexOfFirstVisibleUser(rowsRef.current) >= 0) {
-      warmupDoneSessions.current.add(sk);
-      warmupStateRef.current = "done";
-      return;
-    }
-    if (
-      !shouldStartWarmup({
-        sessionKey: sk,
-        hasVisibleUserMessage: false,
-        warmupState: warmupStateRef.current,
-      })
-    ) {
-      return;
-    }
+    if (!sk || !appEnabled) return;
+    markWarmupDone(sk);
+  }, [appEnabled, markWarmupDone, sessionKey]);
 
-    warmupInFlightRef.current = true;
-    warmupStateRef.current = "running";
-    warmupPromiseRef.current = new Promise<void>((resolve) => {
-      warmupResolveRef.current = resolve;
-    });
-
-    const ok = await sendHiddenContextMessage(WARMUP_MESSAGE);
-    if (!ok) {
-      pushLog("warmup: hidden send failed");
-      warmupStateRef.current = "failed";
-      finishWarmupRun(sk);
-      return;
-    }
-
-    window.setTimeout(() => {
-      if (!warmupInFlightRef.current) return;
-      pushLog("warmup: timeout, unblocking user send");
-      warmupStateRef.current = "failed";
-      finishWarmupRun(sk);
-    }, WARMUP_TIMEOUT_MS);
-  }, [appEnabled, finishWarmupRun, pushLog, sendHiddenContextMessage, sessionKey]);
-
-  const ensureWarmupComplete = useCallback(
-    async (timeoutMs = WARMUP_TIMEOUT_MS) => {
-      const sk = sessionKey.trim();
-      if (!sk || warmupDoneSessions.current.has(sk)) return;
-      if (indexOfFirstVisibleUser(rowsRef.current) >= 0) {
-        warmupDoneSessions.current.add(sk);
-        return;
-      }
-      if (warmupStateRef.current === "failed") return;
-      if (warmupStateRef.current === "idle" && !warmupInFlightRef.current) {
-        void startSessionWarmup();
-      }
-      const p = warmupPromiseRef.current;
-      if (!p) return;
-      await Promise.race([p, new Promise<void>((r) => window.setTimeout(r, timeoutMs))]);
-    },
-    [sessionKey, startSessionWarmup],
-  );
+  const ensureWarmupComplete = useCallback(async () => {
+    const sk = sessionKey.trim();
+    if (!sk || warmupDoneSessions.current.has(sk)) return;
+    markWarmupDone(sk);
+  }, [markWarmupDone, sessionKey]);
 
   useEffect(() => {
     startSessionWarmupRef.current = () => void startSessionWarmup();
     ensureWarmupCompleteRef.current = ensureWarmupComplete;
   }, [ensureWarmupComplete, startSessionWarmup]);
 
-  const injectLocationForSession = useCallback(
-    async (userText: string): Promise<boolean> => {
-      if (!appEnabled || !resolvedLocation) return false;
-      const sk = sessionKey.trim();
-      if (!sk || locationInjectedSessions.current.has(sk)) return true;
-      const c = clientRef.current;
-      if (!c?.connected) return false;
-
-      const inflight = locationInjectInFlightRef.current.get(sk);
-      if (inflight) return inflight;
-
-      const task = (async () => {
-        const msg = formatLocationContextMessage(resolvedLocation, userText);
-        const ok = await sendHiddenContextMessage(msg);
-        if (ok) locationInjectedSessions.current.add(sk);
-        return ok;
-      })();
-      locationInjectInFlightRef.current.set(sk, task);
-      try {
-        return await task;
-      } finally {
-        locationInjectInFlightRef.current.delete(sk);
-      }
-    },
-    [appEnabled, resolvedLocation, sendHiddenContextMessage, sessionKey],
-  );
-
-  /** 仅在用户发送可见消息时注入位置（每 session 一次），不抢先触发 Agent */
-  const ensureLocationInjected = useCallback(
-    async (userText: string, maxWaitMs = LOCATION_INJECT_WAIT_MS): Promise<void> => {
-      if (!appEnabled || !resolvedLocation) return;
-      const sk = sessionKey.trim();
-      if (!sk || locationInjectedSessions.current.has(sk)) return;
-      const deadline = Date.now() + maxWaitMs;
-      while (Date.now() < deadline) {
-        if (locationInjectedSessions.current.has(sk)) return;
-        const ok = await injectLocationForSession(userText);
-        if (ok) return;
-        if (!clientRef.current?.connected) return;
-        await new Promise((r) => window.setTimeout(r, 150));
-      }
-      pushLog(`location inject: wait ${maxWaitMs}ms (send without context)`);
-    },
-    [appEnabled, injectLocationForSession, pushLog, resolvedLocation, sessionKey],
-  );
+  useEffect(() => {
+    finishWarmupRunRef.current = (sk) => markWarmupDone(sk);
+  }, [markWarmupDone]);
 
   useEffect(() => {
-    if (!connected || !appEnabled || !sessionKey.trim()) return;
-    if (indexOfFirstVisibleUser(rows) >= 0) return;
-    void injectLocationForSession("");
-    void startSessionWarmup();
-  }, [appEnabled, connected, injectLocationForSession, rows, sessionKey, startSessionWarmup]);
+    const sk = sessionKey.trim();
+    warmupInFlightRef.current = false;
+    warmupPromiseRef.current = null;
+    warmupResolveRef.current?.();
+    warmupResolveRef.current = null;
+    warmupStateRef.current = sk && warmupDoneSessions.current.has(sk) ? "done" : "idle";
+    if (sk && appEnabled && connected) {
+      void startSessionWarmup();
+    }
+  }, [appEnabled, connected, sessionKey, startSessionWarmup]);
 
   useEffect(() => {
     if (!autoConnect) return;
@@ -2260,10 +3018,13 @@ export default function App() {
   }, [connect, gatewayUrl, token, appEnabled]);
 
   const sendMessage = useCallback(
-    async (text: string, opts?: { displayText?: string; hideVisibleUser?: boolean }) => {
+    async (
+      text: string,
+      opts?: { displayText?: string; hideVisibleUser?: boolean; intakeSkipped?: boolean },
+    ) => {
       const c = clientRef.current;
-      const msg = text.trim();
-      const userVisible = (opts?.displayText ?? msg).trim();
+      let msg = text.trim();
+      let userVisible = (opts?.displayText ?? msg).trim();
       if (!appEnabled || !c?.connected || !msg) return;
       if (isLocationContextMessage(msg)) return;
       if (isWarmupMessage(msg)) return;
@@ -2271,17 +3032,91 @@ export default function App() {
         setStatus("session key required");
         return;
       }
-      cancelItineraryImageGenRef.current();
+      if (!opts?.hideVisibleUser) {
+        const tagged = stripEvalTaskTag(msg);
+        if (tagged.taskId) {
+          evalTaskIdRef.current = tagged.taskId;
+          msg = tagged.text;
+          userVisible = stripEvalTaskTag(userVisible).text;
+          setThreads((prev) => {
+            const next = prev.map((t) =>
+              t.id === activeThreadId ? { ...t, title: tagged.taskId!, updatedAt: Date.now() } : t,
+            );
+            saveThreads(next);
+            return next;
+          });
+        }
+      }
+      evalTurnIndexRef.current += 1;
+      if (evalTurnIndexRef.current === 1) {
+        void logEvalEvent("session_start", {
+          taskId: evalTaskIdRef.current,
+          modelId: currentModelIdRef.current,
+        });
+      }
+      cancelItineraryImageGenRef.current({ userFollowUp: true });
       hadSearchPlacesRef.current = false;
       historyHadSearchRef.current = false;
       seenToolsThisRunRef.current = new Set();
       ackFlushedThisRunRef.current = false;
       ackTextThisRunRef.current = "";
+      if (opts?.intakeSkipped) {
+        skipIntakeAckIdRef.current = `a-skip-intake-ack-${Date.now().toString(36)}`;
+      } else {
+        skipIntakeAckIdRef.current = null;
+      }
       toolStartedThisRunRef.current = false;
+      // ===== 时序评测：记录本轮开始时间 =====
+      const sendTime = Date.now();
+      turnTimingRef.current = {
+        sendTime,
+        firstTextTime: null,
+        firstToolTime: null,
+        endTime: null,
+        toolCalls: [],
+      };
+      activeToolsRef.current = new Map();
+      // ===== 时序评测结束 =====
       setAckFlushedTick((t) => t + 1);
-      await ensureWarmupComplete();
-      await ensureLocationInjected(msg);
       const idem = newIdempotencyKey();
+      const sk = sessionKey.trim();
+
+      if (
+        !opts?.hideVisibleUser &&
+        appEnabled &&
+        resolvedLocation &&
+        shouldInjectLocationPrefix(resolvedLocation, sk, lastInjectedLocationKeyRef.current)
+      ) {
+        msg = mergeLocationPrefix(resolvedLocation, msg);
+      }
+
+      optimisticUserRef.current = msg;
+      if (!opts?.hideVisibleUser) {
+        const userRow: ChatRow = {
+          role: "user",
+          text: userVisible,
+          id: `u-${idem}`,
+          timestamp: sendTime,
+        };
+        setPendingUserDisplay({ id: userRow.id, text: userVisible });
+        setRows((r) => {
+          const next = [...r, userRow];
+          rowsRef.current = next;
+          return next;
+        });
+      }
+      setStreaming("");
+      setAwaitingAgent(true);
+      setToolSteps(() =>
+        appendProcessStep(
+          [],
+          isIntakeSubmissionText(msg)
+            ? "正在提交选项…"
+            : "正在发送，Agent 将生成选择题或方案…",
+        ),
+      );
+      setStatus("sending…");
+
       const streamBuf = streamingRef.current.trim();
       if (streamBuf) {
         setRows((prev) => {
@@ -2292,8 +3127,7 @@ export default function App() {
           return [...prev, { role: "assistant", text: streamBuf, id: `a-flush-${idem}` }];
         });
       }
-      setStreaming("");
-      setAwaitingAgent(true);
+
       setToolSteps((p) =>
         appendProcessStep(
           p,
@@ -2302,11 +3136,12 @@ export default function App() {
             : "消息已发送，Agent 正在回复（补槽 / 调工具 / 生成方案）…",
         ),
       );
-      setStatus("sending…");
-      optimisticUserRef.current = msg;
-      if (!opts?.hideVisibleUser) {
-        setRows((r) => [...r, { role: "user", text: userVisible, id: `u-${idem}` }]);
-      }
+      void logEvalEvent("user_sent", {
+        text: userVisible.slice(0, 500),
+        timestamp: sendTime,
+        hidden: !!opts?.hideVisibleUser,
+        isIntakeSubmission: isIntakeSubmissionText(msg),
+      });
       try {
         const ack = await c.request("chat.send", {
           sessionKey: sessionKey.trim(),
@@ -2314,28 +3149,49 @@ export default function App() {
           idempotencyKey: idem,
         });
         pushLog(`chat.send ack → ${JSON.stringify(ack)}`);
-        void notifyHarnessUserMessage(sessionKey.trim(), msg);
+        if (
+          !opts?.hideVisibleUser &&
+          resolvedLocation &&
+          isLocationContextMessage(msg)
+        ) {
+          lastInjectedLocationKeyRef.current.set(sk, locationSnapshotKey(resolvedLocation));
+        }
+        void notifyHarnessUserMessage(sessionKey.trim(), msg, {
+          intakeSkipped: !!opts?.intakeSkipped,
+        });
         setStatus("connected · sent");
         setThreads((prev) => {
           if (!activeThreadId) return prev;
           const next = prev.map((t) => {
             if (t.id !== activeThreadId) return t;
-            const short = msg.replace(/\s+/g, " ").slice(0, 28);
-            const title =
-              t.title === "新对话" || /^对话 \d+$/.test(t.title) ? short || t.title : t.title;
-            return { ...t, title, updatedAt: Date.now() };
+            // 标题取「可见用户首句」(userVisible 在合并位置前缀之前生成)，
+            // 不能用 msg：msg 可能已被 mergeLocationPrefix 前置「[位置上下文]…」。
+            // 隐藏注入 / 选择题提交载荷不参与命名。
+            const short = userVisible.replace(/\s+/g, " ").slice(0, 28);
+            const isDefault = t.title === "新对话" || /^对话 \d+$/.test(t.title);
+            const useShort =
+              isDefault && !!short && !opts?.hideVisibleUser && !isIntakeSubmissionText(msg);
+            return { ...t, title: useShort ? short : t.title, updatedAt: Date.now() };
           });
           saveThreads(next);
           return next;
         });
         startHistoryPoll();
-        await refreshHistory({ keepOnEmpty: true });
       } catch (e) {
         setAwaitingAgent(false);
+        setPendingUserDisplay(null);
         setStatus(`chat.send failed: ${formatRpcError(e)}`);
       }
     },
-    [activeThreadId, appEnabled, ensureLocationInjected, ensureWarmupComplete, pushLog, refreshHistory, sessionKey, startHistoryPoll],
+    [
+      activeThreadId,
+      appEnabled,
+      logEvalEvent,
+      pushLog,
+      resolvedLocation,
+      sessionKey,
+      startHistoryPoll,
+    ],
   );
 
   const clearIntakeUi = useCallback(() => {
@@ -2344,34 +3200,66 @@ export default function App() {
     setIntakeFollowUp({});
     setFrozenIntake(null);
     setFrozenIntakeIntro("");
-    setIntakeFocusQ(null);
     setIntakeSubmitted(false);
+    setIntakeViaFreetext(false);
     setSubmittedIntake(null);
+    setIntakeUnlockedForNewTrip(false);
+    setSupersededIntake(null);
+    intakeUnlockAppliedRef.current = "";
     setIntakeAnchorUserId(null);
   }, []);
+
+  const lockIntakeSnapshot = useCallback(
+    (snapshot: IntakeSubmittedSnapshot, viaFreetext: boolean) => {
+      setSubmittedIntake(snapshot);
+      setFrozenIntake(snapshot.blocks);
+      setIntakeSelections(snapshot.selections);
+      setIntakeCustom(snapshot.custom);
+      setIntakeFollowUp(snapshot.followUp);
+      setIntakeSubmitted(true);
+      setIntakeViaFreetext(viaFreetext);
+      setIntakeUnlockedForNewTrip(false);
+      setSupersededIntake(null);
+      setIntakeAnchorUserId((prev) => {
+        if (prev) return prev;
+        for (let i = rows.length - 1; i >= 0; i--) {
+          const r = rows[i]!;
+          if (String(r.role).toLowerCase() === "user" && !isIntakeSubmissionText(r.text)) return r.id;
+        }
+        return prev;
+      });
+    },
+    [rows],
+  );
 
   const sendDefaultIntake = useCallback(async () => {
     const blocks = frozenIntake ?? intakeBlocks;
     if (blocks.length) {
-      setSubmittedIntake({
-        blocks,
-        selections: { ...intakeSelections },
-        custom: { ...intakeCustom },
-        followUp: { ...intakeFollowUp },
-      });
-      setFrozenIntake(blocks);
+      lockIntakeSnapshot(
+        {
+          blocks,
+          selections: { ...intakeSelections },
+          custom: { ...intakeCustom },
+          followUp: { ...intakeFollowUp },
+        },
+        false,
+      );
+    } else {
+      setIntakeSubmitted(true);
+      setIntakeViaFreetext(false);
+      setIntakeUnlockedForNewTrip(false);
+      setSupersededIntake(null);
     }
-    setIntakeSubmitted(true);
-    setIntakeAnchorUserId((prev) => {
-      if (prev) return prev;
-      for (let i = rows.length - 1; i >= 0; i--) {
-        const r = rows[i]!;
-        if (String(r.role).toLowerCase() === "user" && !isIntakeSubmissionText(r.text)) return r.id;
-      }
-      return prev;
-    });
     await sendMessage("全部用默认（城市默认坐标、半天、2成人、不忌口、地铁+打车）", { hideVisibleUser: true });
-  }, [frozenIntake, intakeBlocks, intakeCustom, intakeFollowUp, intakeSelections, rows, sendMessage]);
+  }, [
+    frozenIntake,
+    intakeBlocks,
+    intakeCustom,
+    intakeFollowUp,
+    intakeSelections,
+    lockIntakeSnapshot,
+    sendMessage,
+  ]);
 
   const submitIntakeChoices = useCallback(async () => {
     const blocks = frozenIntake ?? intakeBlocks;
@@ -2380,41 +3268,9 @@ export default function App() {
     const custom = { ...intakeCustom };
     const followUp = { ...intakeFollowUp };
     const apiText = formatIntakeSubmission(blocks, selections, custom, followUp);
-    setSubmittedIntake({ blocks, selections, custom, followUp });
-    setFrozenIntake(blocks);
-    setIntakeSubmitted(true);
-    setIntakeAnchorUserId((prev) => {
-      if (prev) return prev;
-      for (let i = rows.length - 1; i >= 0; i--) {
-        const r = rows[i]!;
-        if (String(r.role).toLowerCase() === "user" && !isIntakeSubmissionText(r.text)) return r.id;
-      }
-      return prev;
-    });
+    lockIntakeSnapshot({ blocks, selections, custom, followUp }, false);
     await sendMessage(apiText, { hideVisibleUser: true });
-  }, [frozenIntake, intakeBlocks, intakeCustom, intakeFollowUp, intakeSelections, rows, sendMessage]);
-
-  const applyDraftToIntakeOther = useCallback(
-    (text: string): boolean => {
-      const blocks = frozenIntake ?? intakeBlocks;
-      if (!blocks.length) return false;
-      const q =
-        intakeFocusQ ??
-        blocks.find((b) => {
-          const letter = intakeSelections[b.n];
-          const opt = b.options.find((o) => o.letter === letter);
-          return opt?.isOther;
-        })?.n ??
-        blocks.find((b) => b.options.some((o) => o.isOther) && !intakeSelections[b.n])?.n;
-      if (q == null) return false;
-      const letter =
-        intakeSelections[q] ?? blocks.find((b) => b.n === q)?.options.find((o) => o.isOther)?.letter ?? "D";
-      setIntakeSelections((prev) => ({ ...prev, [q]: letter }));
-      setIntakeCustom((prev) => ({ ...prev, [q]: text }));
-      return true;
-    },
-    [frozenIntake, intakeBlocks, intakeFocusQ, intakeSelections],
-  );
+  }, [frozenIntake, intakeBlocks, intakeCustom, intakeFollowUp, intakeSelections, lockIntakeSnapshot, sendMessage]);
 
   const send = useCallback(async () => {
     const text = draft.trim();
@@ -2423,18 +3279,15 @@ export default function App() {
     const intakeOpen =
       !intakeLocked && blocks.length > 0 && !intakeAnswerComplete(blocks, intakeSelections, intakeCustom, intakeFollowUp);
     if (intakeOpen) {
-      if (applyDraftToIntakeOther(text)) {
-        setDraft("");
-        setStatus("已写入「其他」说明；请点「确认提交」继续规划（直接发送不会跳过问卷）");
-        return;
-      }
-      setStatus("请先点选 A/B/C/D，或在选中「其他」后输入说明；完成后再点「确认提交」");
+      // 口语路径：用户原句只进右侧气泡，绝不写入卡片内 Other 输入框
+      lockIntakeSnapshot({ blocks, selections: {}, custom: {}, followUp: {} }, true);
+      setDraft("");
+      await sendMessage(text, { intakeSkipped: true });
       return;
     }
-    await sendMessage(text);
     setDraft("");
+    await sendMessage(text);
   }, [
-    applyDraftToIntakeOther,
     draft,
     frozenIntake,
     intakeBlocks,
@@ -2442,6 +3295,7 @@ export default function App() {
     intakeFollowUp,
     intakeLocked,
     intakeSelections,
+    lockIntakeSnapshot,
     sendMessage,
   ]);
 
@@ -2461,6 +3315,10 @@ export default function App() {
       const t = threads.find((x) => x.id === threadId);
       if (!t) return;
       if (threadId === activeThreadId && !historyLoading) return;
+      const oldSk = sessionKey.trim();
+      if (oldSk && oldSk !== t.sessionKey) {
+        void detachInactiveSession(oldSk);
+      }
       stopHistoryPoll();
       historyLoadGen.current += 1;
       lastHistorySessionRef.current = "";
@@ -2474,14 +3332,17 @@ export default function App() {
       warmupStateRef.current = "idle";
       clearIntakeUi();
       optimisticUserRef.current = null;
+      setPendingUserDisplay(null);
       rowsRef.current = [];
+      imageGenSuppressedRef.current = false;
+      lastImagePlanFpRef.current = "";
       setActiveThreadId(threadId);
       localStorage.setItem(ACTIVE_THREAD_LS, threadId);
       localStorage.setItem("gw.session", t.sessionKey);
       setSessionKey(t.sessionKey);
       setRows([]);
     },
-    [activeThreadId, clearIntakeUi, historyLoading, threads, stopHistoryPoll],
+    [activeThreadId, clearIntakeUi, detachInactiveSession, historyLoading, sessionKey, threads, stopHistoryPoll],
   );
 
   const createNewThread = useCallback(async () => {
@@ -2495,17 +3356,34 @@ export default function App() {
     }
     pendingNewThreadRef.current = false;
     setCreatingThread(true);
+    const oldSk = sessionKey.trim();
+    if (oldSk) {
+      await detachInactiveSession(oldSk);
+    }
     stopHistoryPoll();
     setStreaming("");
     optimisticUserRef.current = null;
+    setPendingUserDisplay(null);
     clearIntakeUi();
     rowsRef.current = [];
+    warmupInFlightRef.current = false;
+    warmupPromiseRef.current = null;
+    warmupResolveRef.current?.();
+    warmupResolveRef.current = null;
+    warmupStateRef.current = "idle";
     try {
       const newKey = await allocateWebchatSessionKey(c, pushLog, {
         label: `webchat-${getOrCreateDeviceId().slice(0, 24)}-${new Date().toISOString().slice(0, 16)}`,
       });
       const id = "t-" + Date.now().toString(36);
-      const nt: ChatThread = { id, sessionKey: newKey, title: "新对话", updatedAt: Date.now() };
+      const snapModelId = currentModelIdRef.current;
+      const nt: ChatThread = {
+        id,
+        sessionKey: newKey,
+        title: "新对话",
+        updatedAt: Date.now(),
+        modelId: snapModelId,
+      };
       historyLoadGen.current += 1;
       lastHistorySessionRef.current = "";
       setThreads((prev) => {
@@ -2517,16 +3395,29 @@ export default function App() {
       localStorage.setItem(ACTIVE_THREAD_LS, id);
       localStorage.setItem("gw.session", newKey);
       setSessionKey(newKey);
+      sessionKeyRef.current = newKey.trim();
       setRows([]);
       rowsRef.current = [];
+      evalTurnIndexRef.current = 0;
+      intakeShownLoggedRef.current = false;
+      intakeSubmittedLoggedRef.current = false;
+      lastToolProgressCountRef.current = 0;
+      imageGenStartRef.current = null;
+      imageGenSuppressedRef.current = false;
+      lastImagePlanFpRef.current = "";
       setStatus("已新建对话");
+      void logEvalEvent("session_start", {
+        taskId: evalTaskIdRef.current,
+        newThread: true,
+        modelId: snapModelId,
+      });
     } catch (e) {
       pushLog(`createNewThread ${formatRpcError(e)}`);
       setStatus(`新建对话失败：${formatRpcError(e)}`);
     } finally {
       setCreatingThread(false);
     }
-  }, [clearIntakeUi, connect, creatingThread, pushLog, sessionKey, stopHistoryPoll]);
+  }, [clearIntakeUi, connect, creatingThread, detachInactiveSession, logEvalEvent, pushLog, sessionKey, stopHistoryPoll]);
 
   const clearAllLocalHistory = useCallback(() => {
     stopHistoryPoll();
@@ -2536,6 +3427,7 @@ export default function App() {
     clearIntakeUi();
     setThreads([]);
     setActiveThreadId("");
+    setPendingUserDisplay(null);
     setRows([]);
     setSessionKey("");
     setStreaming("");
@@ -2594,13 +3486,16 @@ export default function App() {
   const uiLocked = !appEnabled;
 
   const cardAnchorUserId = useMemo(
-    () => sessionPlanningIntake?.anchorId ?? intakeAnchorUserId ?? findIntakeAnchorUserId(rows),
+    () => sessionPlanningIntake?.anchorId ?? intakeAnchorUserId ?? findIntakeCardAnchorUserId(rows),
     [intakeAnchorUserId, rows, sessionPlanningIntake],
   );
 
   const intakeCardEl =
     showIntakeCard && intakeCardBlocks.length > 0 ? (
       <div className="bubble role-assistant intake-bubble-shell">
+        {supersededIntake ? (
+          <p className="intake-superseded-hint">上一轮选择（已作废）· 请回答下方新问卷</p>
+        ) : null}
         <IntakeCard
           intro={displayIntakeIntro}
           blocks={intakeCardBlocks}
@@ -2608,12 +3503,17 @@ export default function App() {
           custom={intakeLocked && effectiveSubmittedIntake ? effectiveSubmittedIntake.custom : intakeCustom}
           followUp={intakeLocked && effectiveSubmittedIntake ? effectiveSubmittedIntake.followUp ?? {} : intakeFollowUp}
           locked={intakeLocked}
+          grayAllOptions={intakeLocked && intakeViaFreetext}
+          lockedHint={
+            intakeLocked && intakeViaFreetext
+              ? "问卷已锁定；您的回复见下方对话气泡"
+              : undefined
+          }
           showDefault={/全部用默认/.test(intakeParseText)}
           canSubmit={canSubmitIntake}
           uiLocked={uiLocked}
-          onSelect={(n, letter, isOther, hasFollowUp) => {
+          onSelect={(n, letter) => {
             setIntakeSelections((prev) => ({ ...prev, [n]: letter }));
-            setIntakeFocusQ(isOther || hasFollowUp ? n : null);
           }}
           onCustomChange={(n, value) => setIntakeCustom((prev) => ({ ...prev, [n]: value }))}
           onFollowUpChange={(n, value) => setIntakeFollowUp((prev) => ({ ...prev, [n]: value }))}
@@ -2697,6 +3597,27 @@ export default function App() {
             同一主机打开本页，或为网关配置 <strong>wss://</strong>（如 Nginx/Caddy 反代 18789）。
           </p>
         ) : null}
+        {compactUi && appEnabled ? (
+          <div className="model-selector">
+            <select
+              className="model-select"
+              value={currentModelId}
+              disabled={modelSwitching}
+              onChange={(e) => handleSwitchModel(e.target.value)}
+              title={modelSwitching ? "切换中…" : "切换 Agent LLM 模型"}
+            >
+              {availableModels.length === 0 ? (
+                <option value="">加载中…</option>
+              ) : (
+                availableModels.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))
+              )}
+            </select>
+            {modelSwitching ? <span className="model-switch-indicator">⏳</span> : null}
+            {modelSwitchMsg ? <span className="model-switch-msg">{modelSwitchMsg}</span> : null}
+          </div>
+        ) : null}
       </header>
 
       <div className="main-layout">
@@ -2746,8 +3667,13 @@ export default function App() {
                     <span className="thread-title">{t.title || "未命名"}</span>
                     {!compactUi ? (
                       <span className="thread-sub">
+                        {t.modelId
+                          ? `${modelLabelForId(t.modelId, availableModels) || t.modelId} · `
+                          : ""}
                         {t.sessionKey.length > 36 ? `${t.sessionKey.slice(0, 32)}…` : t.sessionKey}
                       </span>
+                    ) : t.modelId ? (
+                      <span className="thread-sub">{modelLabelForId(t.modelId, availableModels) || t.modelId}</span>
                     ) : null}
                   </button>
                 </li>
@@ -2821,50 +3747,90 @@ export default function App() {
       <main className="chat">
         <div className="stream" ref={streamScrollRef}>
           {(() => {
-            let intakeCardPlaced = false;
-            const bubbles = displayRows.map((r) => {
-              const rl = String(r.role).toLowerCase();
-              if (isHiddenChatRow(rl, r.text)) {
-                return null;
-              }
-              if (rl === "assistant" && isNoiseAssistantBubble(r.text)) {
-                return null;
-              }
-              if (rl === "assistant" && isIntakeQuestionBubble(r.text)) {
-                return null;
-              }
-              const placeCardWithUser =
-                intakeCardEl &&
-                !intakeCardPlaced &&
-                rl === "user" &&
-                cardAnchorUserId != null &&
-                cardAnchorUserId === r.id;
-              if (placeCardWithUser) intakeCardPlaced = true;
+            type StreamItem =
+              | { kind: "bubble"; key: string; node: ReactNode }
+              | { kind: "intake-card"; key: string; node: ReactNode }
+              | { kind: "pending-user"; key: string; node: ReactNode };
 
-              const bubble = (
-                <div key={r.id} className={`bubble role-${rl}`}>
-                  <div className="role">{rl}</div>
-                  <MarkdownErrorBoundary text={r.text}>
-                    <BubbleMarkdown text={r.text} />
-                  </MarkdownErrorBoundary>
-                </div>
-              );
-              if (placeCardWithUser) {
-                return (
-                  <Fragment key={`${r.id}-with-intake`}>
-                    {bubble}
-                    {intakeCardEl}
-                  </Fragment>
-                );
+            const items: StreamItem[] = [];
+            let cardInserted = false;
+
+            const pushIntakeCard = () => {
+              if (!intakeCardEl || cardInserted) return;
+              items.push({ kind: "intake-card", key: "intake-card", node: intakeCardEl });
+              cardInserted = true;
+            };
+
+            for (const r of displayRows) {
+              const rl = String(r.role).toLowerCase();
+              if (isHiddenChatRow(rl, r.text)) continue;
+              if (rl === "assistant" && isNoiseAssistantBubble(r.text)) continue;
+              if (rl === "assistant" && isIntakeQuestionBubble(r.text)) continue;
+              if (
+                rl === "assistant" &&
+                intakePhasePending &&
+                !hasIntakeQuestions(extractIntakeOnlyText(r.text))
+              ) {
+                continue;
               }
-              return bubble;
-            });
-            return (
-              <>
-                {bubbles}
-                {!intakeCardPlaced ? intakeCardEl : null}
-              </>
-            );
+
+              const userBubbleText =
+                rl === "user" ? extractUserVisibleTextFromMessage(r.text) : r.text;
+              if (rl === "user" && !userBubbleText.trim()) continue;
+
+              items.push({
+                kind: "bubble",
+                key: r.id,
+                node: (
+                  <div className={`bubble-row ${rl === "user" ? "bubble-row-user" : "bubble-row-assistant"}`}>
+                    <div className={`bubble role-${rl}`}>
+                      {rl !== "user" ? <div className="role">{rl}</div> : null}
+                      <MarkdownErrorBoundary text={userBubbleText}>
+                        <BubbleMarkdown text={userBubbleText} />
+                      </MarkdownErrorBoundary>
+                    </div>
+                  </div>
+                ),
+              });
+
+              if (rl === "user" && cardAnchorUserId != null && cardAnchorUserId === r.id) {
+                pushIntakeCard();
+              }
+            }
+
+            if (intakeCardEl && !cardInserted) {
+              const anchorBubbleIdx = items.findIndex(
+                (it) => it.kind === "bubble" && it.key === cardAnchorUserId,
+              );
+              const cardItem: StreamItem = { kind: "intake-card", key: "intake-card", node: intakeCardEl };
+              if (anchorBubbleIdx >= 0) {
+                items.splice(anchorBubbleIdx + 1, 0, cardItem);
+              } else {
+                items.push(cardItem);
+              }
+              cardInserted = true;
+            }
+
+            if (
+              pendingUserDisplay &&
+              !displayRows.some((r) => r.id === pendingUserDisplay.id)
+            ) {
+              items.push({
+                kind: "pending-user",
+                key: pendingUserDisplay.id,
+                node: (
+                  <div className="bubble-row bubble-row-user">
+                    <div className="bubble role-user">
+                      <MarkdownErrorBoundary text={pendingUserDisplay.text}>
+                        <BubbleMarkdown text={pendingUserDisplay.text} />
+                      </MarkdownErrorBoundary>
+                    </div>
+                  </div>
+                ),
+              });
+            }
+
+            return items.map((it) => <Fragment key={it.key}>{it.node}</Fragment>);
           })()}
           {showLiveBubble &&
           liveStreamText.trim() &&
@@ -2881,6 +3847,22 @@ export default function App() {
               </MarkdownErrorBoundary>
             </div>
           ) : null}
+          {showIntakeLoading ? (
+            <div className="bubble role-assistant typing-bubble" aria-live="polite">
+              <div className="role">assistant</div>
+              <p className="typing-line">
+                正在生成选择题
+                <span className="typing-dots">
+                  <span>.</span>
+                  <span>.</span>
+                  <span>.</span>
+                </span>
+                {visibleToolSteps.some((s) => /加载行程规划指引/.test(s.msg))
+                  ? "（已加载规划指引，稍候）"
+                  : null}
+              </p>
+            </div>
+          ) : null}
         </div>
         <div className="composer">
           {appEnabled && wasEverConnected ? (
@@ -2888,8 +3870,12 @@ export default function App() {
               <div className="process-log-title">任务进展 · 工具调用</div>
               {!connected ? (
                 <p className="process-log-status">网络重连中，请稍候再发送…</p>
-              ) : awaitingAgent ? (
+              ) : suppressToolProgress && awaitingAgent && visibleToolSteps.length === 0 ? (
+                <p className="process-log-status">正在生成选择题…</p>
+              ) : awaitingAgent && visibleToolSteps.length === 0 ? (
                 <p className="process-log-status">处理中（补槽 / 调工具 / 生成方案）…</p>
+              ) : intakeActive && visibleToolSteps.length === 0 ? (
+                <p className="process-log-status">请先完成上方选择题，提交后 Agent 将调用工具进行规划</p>
               ) : imageGenPending && hasVisibleUserMessage ? (
                 <p className="process-log-status">长文已就绪，正在绘制行程一览图…</p>
               ) : visibleToolSteps.length === 0 ? (
@@ -2905,7 +3891,7 @@ export default function App() {
           ) : null}
           {showIntakeCard && !intakeLocked && displayIntakeBlocksResolved.length > 0 ? (
             <p className="intake-composer-hint">
-              请在上方卡片点选后点「确认提交」；确认前可改选，确认后不可修改。
+              在下方输入口语回复后 Enter 发送；发送后问卷全部置灰，您的句子会像首句一样显示在右侧，Agent 随即开始规划。
             </p>
           ) : null}
           <div className="composer-input-row">
@@ -2913,7 +3899,11 @@ export default function App() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={3}
-              placeholder="槽位未提交时：Enter 写入「其他」说明；提交后 Enter 发送消息"
+              placeholder={
+                showIntakeCard && !intakeLocked
+                  ? "用口语回答即可，如：我们3个人，地铁出行，不忌口…"
+                  : "Enter 发送，Shift+Enter 换行"
+              }
               disabled={uiLocked}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {

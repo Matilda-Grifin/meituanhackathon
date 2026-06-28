@@ -6,6 +6,11 @@ export type IntakeBlock = { n: number; title: string; options: IntakeOption[] };
 
 const OPTION_LETTERS = "A-F";
 const FOLLOW_UP_TAG = /\{\{followUp:([^}]+)\}\}/;
+/** 题号：1. / 1、 / 1️⃣ / 第1题（MiniMax 等） */
+const INTAKE_Q_NUM_RE = /^(\d+)(?:[\.、．]|\uFE0F?\u20E3)\s*(.*)$/;
+const INTAKE_Q_NUM_LINE_RE = /(?:^|\n)\s*(\d+)(?:[\.、．]|\uFE0F?\u20E3)\s/mg;
+const INTAKE_Q_CN_NUM_RE = /^第\s*(\d+)\s*题(?:\s*[·\.、．]\s*)?(.*)$/;
+const INTAKE_Q_CN_LINE_RE = /(?:^|\n)\s*第\s*(\d+)\s*题/mg;
 
 /** 问卷展示：去掉模型输出的 Markdown 加粗/星号 */
 export function cleanIntakeDisplayText(s: string): string {
@@ -22,7 +27,7 @@ const INTAKE_CUT_PATTERNS: RegExp[] = [
   /\n##\s*📋/,
   /\n##\s*💰/,
   /\n#\s+/,
-  /\n---\s*\n/,
+  // 勿用 \n---\n：MiniMax 等模型在问卷题与题之间也用 ---，误截断会导致 IntakeCard 不挂载
   /行程速览/,
   /预算参考/,
 ];
@@ -33,7 +38,7 @@ function findIntakeSoftEnd(src: string): number {
   let lastOptionLine = -1;
   for (let i = 0; i < lines.length; i++) {
     const t = lines[i]!.trim();
-    if (/^\d+[\.、．]\s/.test(t)) sawQuestion = true;
+    if (/^\d+(?:[\.、．]|\uFE0F?\u20E3)\s/.test(t) || /^第\s*\d+\s*题/.test(t)) sawQuestion = true;
     if (
       /^[A-FＡ-Ｆ][\.、．、：)]/.test(t) ||
       /^[-*•]\s/.test(t) ||
@@ -44,7 +49,9 @@ function findIntakeSoftEnd(src: string): number {
     if (!sawQuestion || lastOptionLine < 0 || i <= lastOptionLine) continue;
     if (!t) continue;
     const intakeLine =
-      /^(\d+[\.、．]|[A-FＡ-Ｆ][\.、．、：)]|[-*•]\s|\*\*[A-F]|全部用默认|直接回复|确认提交)/.test(t);
+      /^(\d+(?:[\.、．]|\uFE0F?\u20E3)|第\s*\d+\s*题|[A-FＡ-Ｆ][\.、．、：)]|[-*•]\s|\*\*[A-F]|全部用默认|直接回复|确认提交)/.test(
+        t,
+      );
     if (!intakeLine) {
       let charIdx = 0;
       for (let j = 0; j < i; j++) charIdx += lines[j]!.length + 1;
@@ -126,6 +133,16 @@ function extractBoldOptionsFromLine(line: string, block: IntakeBlock) {
   }
 }
 
+function parseIntakeQuestionHead(stripped: string): { n: number; rest: string } | null {
+  const cnHead = stripped.match(INTAKE_Q_CN_NUM_RE);
+  if (cnHead) return { n: parseInt(cnHead[1]!, 10), rest: (cnHead[2] ?? "").trim() };
+  const qHead = stripped.match(/^(\d+)(?:[\.、．]|\)|）)\s*(.*)$/);
+  if (qHead) return { n: parseInt(qHead[1]!, 10), rest: (qHead[2] ?? "").trim() };
+  const emojiHead = stripped.match(INTAKE_Q_NUM_RE);
+  if (emojiHead) return { n: parseInt(emojiHead[1]!, 10), rest: (emojiHead[2] ?? "").trim() };
+  return null;
+}
+
 function stripMd(line: string): string {
   return cleanIntakeDisplayText(
     line
@@ -144,7 +161,7 @@ function tryParseOptionLine(line: string, block: IntakeBlock): boolean {
   const n0 = block.options.length;
   const t = stripMd(line);
   if (!t || /^#{1,6}\s/.test(t) || isIntakeFooterLine(t)) return false;
-  if (/^\d+[\.、．]\s/.test(t)) return false;
+  if (/^\d+(?:[\.、．]|\uFE0F?\u20E3)\s/.test(t) || /^第\s*\d+\s*题/.test(t)) return false;
 
   extractBoldOptionsFromLine(t, block);
   if (block.options.length > n0) return true;
@@ -204,7 +221,10 @@ export function mergeIntakeBlocks(prev: IntakeBlock[] | null, next: IntakeBlock[
 }
 
 function extractIntro(text: string): string {
-  const m = text.match(/^([\s\S]*?)(?=\n\s*\d+[\.、．]\s)/);
+  const m =
+    text.match(/^([\s\S]*?)(?=\n\s*第\s*\d+\s*题)/) ||
+    text.match(/^([\s\S]*?)(?=\n\s*\d+(?:[\.、．]|\uFE0F?\u20E3)\s)/) ||
+    text.match(/^([\s\S]*?)(?=\n\s*\d+[\.、．]\s)/);
   if (!m?.[1]) return "";
   return cleanIntakeDisplayText(m[1]!.replace(/^#+\s*/gm, ""));
 }
@@ -229,10 +249,10 @@ export function parseIntakeSurvey(text: string): { intro: string; blocks: Intake
   for (const raw of lines) {
     const line = raw.trimEnd();
     const stripped = stripMd(line);
-    const qHead = stripped.match(/^(\d+)(?:[\.、．]|\)|）)\s*(.*)$/);
-    if (qHead) {
-      curN = parseInt(qHead[1]!, 10);
-      const rest = (qHead[2] ?? "").trim();
+    const head = parseIntakeQuestionHead(stripped);
+    if (head) {
+      curN = head.n;
+      const rest = head.rest;
       const b = curBlock()!;
       if (rest) b.title = stripOptionFromTitle(stripMd(rest)) || b.title;
       extractBoldOptionsFromLine(rest, b);
@@ -245,17 +265,42 @@ export function parseIntakeSurvey(text: string): { intro: string; blocks: Intake
     tryParseOptionLine(line, b);
   }
 
-  const sections = src.split(/(?=\n\s*\d+[\.、．]\s*)/);
+  const sections = src.split(/(?=\n\s*(?:第\s*\d+\s*题|\d+(?:[\.、．]|\uFE0F?\u20E3))\s*)/);
   for (const sec of sections) {
-    const head = sec.match(/^\s*(\d+)[\.、．]\s*([^\n]*)/);
-    if (!head) continue;
-    const n = parseInt(head[1]!, 10);
+    const secStripped = stripMd(sec.split("\n")[0] ?? "");
+    const head = parseIntakeQuestionHead(secStripped);
+    if (!head) {
+      const secHead =
+        sec.match(/^\s*(\d+)[\.、．]\s*([^\n]*)/) ||
+        sec.match(/^\s*(\d+)\uFE0F?\u20E3\s*([^\n]*)/) ||
+        sec.match(/^\s*第\s*(\d+)\s*题(?:\s*[·\.、．]\s*)?([^\n]*)/);
+      if (!secHead) continue;
+      const n = parseInt(secHead[1]!, 10);
+      let b = byN.get(n);
+      if (!b) {
+        b = { n, title: stripOptionFromTitle(secHead[2] ?? ""), options: [] };
+        byN.set(n, b);
+      } else if (!b.title && secHead[2]) {
+        b.title = stripOptionFromTitle(secHead[2]);
+      }
+      extractBoldOptionsFromLine(sec, b);
+      const plainRe = /(?:^|\n)\s*([A-F])(?:[\.、．]|\)|）|：)\s*([^\n]+)/gi;
+      let pm: RegExpExecArray | null;
+      while ((pm = plainRe.exec(sec)) !== null) {
+        addIntakeOption(b, pm[1]!, pm[2]!);
+      }
+      for (const raw of sec.split("\n").slice(1)) {
+        tryParseOptionLine(raw, b);
+      }
+      continue;
+    }
+    const n = head.n;
     let b = byN.get(n);
     if (!b) {
-      b = { n, title: stripOptionFromTitle(head[2] ?? ""), options: [] };
+      b = { n, title: stripOptionFromTitle(head.rest), options: [] };
       byN.set(n, b);
-    } else if (!b.title && head[2]) {
-      b.title = stripOptionFromTitle(head[2]);
+    } else if (!b.title && head.rest) {
+      b.title = stripOptionFromTitle(head.rest);
     }
     extractBoldOptionsFromLine(sec, b);
     const plainRe = /(?:^|\n)\s*([A-F])(?:[\.、．]|\)|）|：)\s*([^\n]+)/gi;
@@ -283,7 +328,10 @@ export function hasIntakeQuestions(text: string): boolean {
   const intakeOnly = extractIntakeOnlyText(text);
   if (parseQuestionBlocks(intakeOnly).length > 0) return true;
   const t = intakeOnly.replace(/\r\n/g, "\n");
-  const qs = (t.match(/(?:^|\n)\s*\d+[\.、．]\s/mg) || []).length;
+  const qs =
+    (t.match(/(?:^|\n)\s*\d+[\.、．]\s/mg) || []).length +
+    (t.match(INTAKE_Q_NUM_LINE_RE) || []).length +
+    (t.match(INTAKE_Q_CN_LINE_RE) || []).length;
   const opts = (t.match(/(?:^|\n)\s*[A-FＡ-Ｆ][\.、．、：]\s/mg) || []).length;
   return qs >= 1 && opts >= 2;
 }

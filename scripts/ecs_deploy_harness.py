@@ -33,6 +33,8 @@ DEPLOY_PATHS = [
     "测试/rubric_engine.py",
     "gateway-chat-ui/src/harnessClient.ts",
     "gateway-chat-ui/src/App.tsx",
+    "gateway-chat-ui/src/presentChatRows.ts",
+    "gateway-chat-ui/src/chatHistoryMerge.ts",
     "gateway-chat-ui/scripts/ecs_apply_lifecare_openclaw.py",
     "scripts/ecs_backup_online.py",
     "scripts/ecs_deploy_harness.py",

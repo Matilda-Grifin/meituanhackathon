@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from vitabench_eval.llm_client import chat_completion, load_repo_env, parse_json_array
+from vitabench_eval.llm_client import chat_completion_with_usage, load_repo_env, merge_usage, parse_json_array
 from vitabench_eval.prompt_loader import load_yaml_prompt
 
 _TEMPLATE_PATH = Path(__file__).resolve().parent / "prompts" / "sliding_window_eval_template.yaml"
@@ -96,6 +96,8 @@ def evaluate_trajectory(
     *,
     model: str = "judge",
     temperature: float = 0.1,
+    session_id: str = "",
+    batch: str = "",
 ) -> dict[str, Any]:
     load_repo_env()
     criteria = task.get("evaluation_criteria") or {}
@@ -114,6 +116,8 @@ def evaluate_trajectory(
     windows = _sliding_windows(messages)
     step = WINDOW_SIZE - OVERLAP
     window_logs: list[dict] = []
+    judge_usage: dict = {"input": 0, "output": 0, "total": 0, "reasoning": 0, "cacheRead": 0, "runs": 0}
+    judge_model_id = ""
 
     for wi, window in enumerate(windows):
         start_idx = wi * step if len(messages) > WINDOW_SIZE else 0
@@ -132,7 +136,7 @@ def evaluate_trajectory(
             f"{_format_rubrics(states)}\n"
             "</current_rubrics>"
         )
-        raw = chat_completion(
+        out = chat_completion_with_usage(
             model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -141,8 +145,16 @@ def evaluate_trajectory(
             temperature=temperature,
             max_tokens=4096,
             timeout_s=180,
+            usage_role="judge",
+            session_id=session_id,
+            task_id=str(task.get("id") or ""),
+            batch=batch,
         )
-        updates = parse_json_array(raw)
+        merge_usage(judge_usage, out.get("usage"), model=out.get("model") or "")
+        if out.get("model"):
+            judge_model_id = out["model"]
+        judge_usage["runs"] = int(judge_usage.get("runs") or 0) + 1
+        updates = parse_json_array(out.get("text") or "")
         for item in updates:
             key = item.get("rubric_idx")
             if key and key in states:
@@ -163,4 +175,5 @@ def evaluate_trajectory(
         "window_logs": window_logs,
         "rubric_met": met,
         "rubric_total": total,
+        "usage": {**judge_usage, "model": judge_model_id},
     }

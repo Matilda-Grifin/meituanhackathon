@@ -282,11 +282,51 @@ export function formatLocationContextMessage(loc: ResolvedLocation, userText?: s
 
   const nowLocal = formatLocalNowForAgent();
   return (
-    `${LOCATION_CTX_MARKER} 用户已同意本页获取位置（本条紧随用户首条可见消息之后注入，勿抢先回复）。` +
+    `${LOCATION_CTX_MARKER} 用户已同意本页获取位置（本条与用户首句在同一条 user 消息中）。` +
+    `读完下方用户原话与定位后，直接按 travel-intake 出 2～3 道选择题；禁止 NO_REPLY、禁止先调 lifecare 工具。` +
+    `问卷排版强制：题用「1. 题干」「2. 题干」、选项用「A. …」各占一行，题间空行；禁止 ---、1️⃣、第1题、Markdown 加粗题号。` +
     `当前推测：${loc.summary}${acc}。${coord}` +
     `当前当地时间：${nowLocal}（Asia/Shanghai）。用户选「现在出发」时以此为 T_now；可玩截止默认当日 23:00。` +
     sceneBlock
   );
+}
+
+export function locationSnapshotKey(loc: ResolvedLocation): string {
+  const lng = loc.lng != null ? loc.lng.toFixed(3) : "";
+  const lat = loc.lat != null ? loc.lat.toFixed(3) : "";
+  return `${loc.city}|${loc.district}|${lng}|${lat}`;
+}
+
+export function mergeLocationPrefix(loc: ResolvedLocation, userText: string): string {
+  const visible = userText.trim();
+  const prefix = formatLocationContextMessage(loc, visible);
+  return `${prefix}\n\n${visible}`;
+}
+
+/** 从合并后的 user 消息中取出对话区应展示的用户原话 */
+export function extractUserVisibleTextFromMessage(text: string): string {
+  const t = text.trimStart();
+  if (!t.startsWith(LOCATION_CTX_MARKER)) return text;
+  const sep = text.indexOf("\n\n");
+  if (sep < 0) return "";
+  return text.slice(sep + 2).trim();
+}
+
+/** 是否为「仅位置注入、无用户原话」的 hidden user（旧会话或异常） */
+export function isLocationContextOnlyMessage(text: string): boolean {
+  const t = text.trimStart();
+  if (!t.startsWith(LOCATION_CTX_MARKER)) return false;
+  return !extractUserVisibleTextFromMessage(text).trim();
+}
+
+export function shouldInjectLocationPrefix(
+  loc: ResolvedLocation | null,
+  sessionKey: string,
+  lastInjectedKeyBySession: Map<string, string>,
+): boolean {
+  if (!loc || !sessionKey.trim()) return false;
+  const key = locationSnapshotKey(loc);
+  return lastInjectedKeyBySession.get(sessionKey.trim()) !== key;
 }
 
 export function isLocationContextMessage(text: string): boolean {

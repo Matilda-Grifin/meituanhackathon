@@ -1,7 +1,42 @@
 /** 完整方案判定 + 行程信息图 API（方案 v3：长文 final 后第 2 条气泡） */
 
-import { isItineraryImageBubble, stripLeadingAckFromPlan } from "./presentChatRows";
+import { isItineraryImageBubble, isVisibleUserRow, stripLeadingAckFromPlan } from "./presentChatRows";
 import type { ChatRow } from "./chatHistoryMerge";
+
+function normRole(role: string): string {
+  return String(role).toLowerCase();
+}
+
+/** 最长 assistant 正文（不含行程图泡）的下标；-1 表示无 */
+export function findLongestPlanAssistantIndex(rows: ChatRow[]): number {
+  let bestIdx = -1;
+  let bestLen = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]!;
+    if (normRole(r.role) !== "assistant") continue;
+    if (isItineraryImageBubble(r.text)) continue;
+    const len = r.text.trim().length;
+    if (len > bestLen) {
+      bestLen = len;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
+}
+
+export function hasVisibleUserAfterRowIndex(rows: ChatRow[], index: number): boolean {
+  for (let i = index + 1; i < rows.length; i++) {
+    if (isVisibleUserRow(rows[i]!)) return true;
+  }
+  return false;
+}
+
+/** 方案锚点之后已有用户追问 → 不应再触发生图 / 不应补回持久化图 */
+export function shouldAllowItineraryImageForRows(rows: ChatRow[]): boolean {
+  const idx = findLongestPlanAssistantIndex(rows);
+  if (idx < 0) return false;
+  return !hasVisibleUserAfterRowIndex(rows, idx);
+}
 
 /** 长文含行程速览表时，可推断已搜点（history 回填 / 断线重连） */
 export function planQualifiesForSearchInference(text: string): boolean {

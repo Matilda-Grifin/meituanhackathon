@@ -148,9 +148,15 @@ def check_pre_tool(tool_name: str, arguments: dict[str, Any] | None = None) -> s
         log_event(session_key=session_key, phase="pre_tool", action="blocked", rule_id=rid, tool=norm, extra=schema)
         return _blocked_payload(rid, _HINTS[rid])
 
+    # 预算按「当前轮」计：追问改方案能重新搜点，避免整段会话累计上限卡死后续轮（丢 POI/配图）。
+    cur_turn = int(state.get("turn_seq") or 0)
+    turn_tools = [
+        t for t in (state.get("tools_called") or [])
+        if int(t.get("turn_seq") or 0) == cur_turn
+    ]
     ok_budget, budget_rule = check_budget(
         state.get("slots") or {},
-        state.get("tools_called") or [],
+        turn_tools,
         policy,
         next_tool=norm,
     )

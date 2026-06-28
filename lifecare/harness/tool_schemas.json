@@ -19,8 +19,7 @@
         "latitude": "number",
         "longitude": "number",
         "forecast_days": "int_1_16"
-      },
-      "at_least_one_of": ["city", "latitude"]
+      }
     },
     "lifecare_plan_route": {
       "required": ["origin_lng", "origin_lat", "dest_lng", "dest_lat"],

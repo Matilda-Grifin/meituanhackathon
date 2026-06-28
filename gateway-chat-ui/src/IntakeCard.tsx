@@ -7,6 +7,9 @@ export type IntakeCardProps = {
   custom: Record<number, string>;
   followUp: Record<number, string>;
   locked: boolean;
+  lockedHint?: string;
+  /** 口语发送后：选项全部置灰，不高亮任何 pill，不展示 Other 输入框 */
+  grayAllOptions?: boolean;
   showDefault?: boolean;
   canSubmit: boolean;
   uiLocked: boolean;
@@ -25,6 +28,8 @@ export function IntakeCard({
   custom,
   followUp,
   locked,
+  lockedHint,
+  grayAllOptions,
   showDefault,
   canSubmit,
   uiLocked,
@@ -37,14 +42,17 @@ export function IntakeCard({
   if (!blocks.length) return null;
 
   return (
-    <div className={`intake-bubble${locked ? " intake-bubble--submitted" : ""}`} aria-label={locked ? "槽位问卷（已提交）" : "槽位问卷"}>
+    <div
+      className={`intake-bubble${locked ? " intake-bubble--submitted" : ""}${grayAllOptions ? " intake-bubble--freetext-locked" : ""}`}
+      aria-label={locked ? "槽位问卷（已锁定）" : "槽位问卷"}
+    >
       {intro ? <p className="intake-bubble-intro">{intro}</p> : null}
       {blocks.map((b) => (
         <div key={b.n} className="intake-bubble-q">
           <p className="intake-bubble-qtext">{b.title || `第 ${b.n} 题`}</p>
           <div className="intake-bubble-options" role="group" aria-label={`第 ${b.n} 题选项`}>
             {b.options.map((o) => {
-              const on = selections[b.n] === o.letter;
+              const on = !grayAllOptions && selections[b.n] === o.letter;
               return (
                 <button
                   key={`${b.n}-${o.letter}`}
@@ -64,7 +72,7 @@ export function IntakeCard({
               );
             })}
           </div>
-          {!locked && b.options.some((o) => o.letter === selections[b.n] && o.isOther) ? (
+          {!locked && !grayAllOptions && b.options.some((o) => o.letter === selections[b.n] && o.isOther) ? (
             <input
               type="text"
               className="intake-bubble-input"
@@ -75,6 +83,7 @@ export function IntakeCard({
             />
           ) : null}
           {!locked &&
+          !grayAllOptions &&
           (() => {
             const letter = selections[b.n];
             const opt = b.options.find((o) => o.letter === letter);
@@ -94,10 +103,10 @@ export function IntakeCard({
         </div>
       ))}
       {locked ? (
-        <p className="intake-bubble-locked-hint">已确认，选项不可修改</p>
+        <p className="intake-bubble-locked-hint">{lockedHint ?? "已确认，选项不可修改"}</p>
       ) : (
         <>
-          <p className="intake-bubble-edit-hint">点选各题答案，确认前可随时改选</p>
+          <p className="intake-bubble-edit-hint">可点选各题，或直接在下方输入框用口语回复</p>
           <div className="intake-bubble-actions">
             {showDefault ? (
               <button type="button" className="intake-action-btn intake-action-default" disabled={uiLocked} onClick={onDefault}>

@@ -1,4 +1,6 @@
-/** 会话空闲预热：在用户首句前触发 Agent 读取 workspace 规则 */
+/** 会话预热：已改为 SOUL bootstrap 预注入，不再向 Agent 发送 `[系统预热]` */
+
+export const WARMUP_ENABLED = false;
 
 export const WARMUP_MESSAGE =
   "[系统预热] 请读取 workspace 中的 SOUL.md、AGENTS.md、skills/travel-intake/SKILL.md，" +
@@ -17,6 +19,7 @@ export function shouldStartWarmup(opts: {
   hasVisibleUserMessage: boolean;
   warmupState: WarmupState;
 }): boolean {
+  if (!WARMUP_ENABLED) return false;
   if (!opts.sessionKey.trim()) return false;
   if (opts.hasVisibleUserMessage) return false;
   if (opts.warmupState === "done" || opts.warmupState === "running") return false;

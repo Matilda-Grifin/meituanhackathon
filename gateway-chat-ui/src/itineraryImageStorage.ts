@@ -1,7 +1,7 @@
 /** 行程一览图气泡：按 sessionKey 本地持久化（网关 history 不含生图行） */
 
 import type { ChatRow } from "./chatHistoryMerge";
-import { findLongestPlanText, rowsHasItineraryImage } from "./itineraryImage";
+import { findLongestPlanText, rowsHasItineraryImage, shouldAllowItineraryImageForRows } from "./itineraryImage";
 import { isItineraryImageBubble } from "./presentChatRows";
 
 const LS_KEY = "gw.chat.itineraryImages";
@@ -74,10 +74,11 @@ function insertImageRowAfterPlan(rows: ChatRow[], imgRow: ChatRow): ChatRow[] {
   return next;
 }
 
-/** history 合并后：若服务端无图且本地有缓存，补回气泡（多轮追问时方案指纹可能微变，按 session 恢复） */
+/** history 合并后：若服务端无图且本地有缓存，补回气泡（用户已追问则不再补） */
 export function appendPersistedItineraryImage(sessionKey: string, rows: ChatRow[]): ChatRow[] {
   if (!sessionKey.trim() || rowsHasItineraryImage(rows)) return rows;
   if (!findLongestPlanText(rows)) return rows;
+  if (!shouldAllowItineraryImageForRows(rows)) return rows;
   const stored = loadPersistedItineraryImageForSession(sessionKey);
   if (!stored) return rows;
   return insertImageRowAfterPlan(rows, stored);
