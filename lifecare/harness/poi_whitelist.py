@@ -24,10 +24,28 @@ class PoiEntry:
     normalized: str = ""
     poi_type: str = ""
     photo_urls: list[str] = field(default_factory=list)
+    lng: float | None = None
+    lat: float | None = None
+    rating: float | None = None
+    cost: str | None = None
 
     def __post_init__(self) -> None:
         if not self.normalized:
             self.normalized = normalize_poi_name(self.name)
+
+    def to_api_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "amap_place_url": self.amap_place_url,
+            "poi_type": self.poi_type,
+            "photo_urls": self.photo_urls,
+            "location": {"lng": self.lng, "lat": self.lat}
+            if self.lng is not None and self.lat is not None
+            else None,
+            "rating": self.rating,
+            "cost": self.cost,
+        }
 
 
 @dataclass
@@ -81,7 +99,34 @@ def extract_pois_from_tool_result(result: str) -> list[PoiEntry]:
             u for u in (p.get("photo_urls") or [])
             if isinstance(u, str) and u.startswith(("http://", "https://"))
         ][:3]
-        out.append(PoiEntry(id=pid, name=name, amap_place_url=url, poi_type=ptype, photo_urls=photos))
+        loc = p.get("location") if isinstance(p.get("location"), dict) else {}
+        lng = loc.get("lng")
+        lat = loc.get("lat")
+        rating: float | None = None
+        cost: str | None = None
+        rep = p.get("reputation") if isinstance(p.get("reputation"), dict) else {}
+        gaode = rep.get("gaode") if isinstance(rep.get("gaode"), dict) else {}
+        if gaode.get("rating") is not None:
+            try:
+                rating = float(gaode["rating"])
+            except (TypeError, ValueError):
+                rating = None
+        raw_cost = gaode.get("cost")
+        if raw_cost not in (None, ""):
+            cost = str(raw_cost).strip()
+        out.append(
+            PoiEntry(
+                id=pid,
+                name=name,
+                amap_place_url=url,
+                poi_type=ptype,
+                photo_urls=photos,
+                lng=float(lng) if lng is not None else None,
+                lat=float(lat) if lat is not None else None,
+                rating=rating,
+                cost=cost,
+            )
+        )
     return out
 
 
@@ -97,12 +142,21 @@ def build_whitelist_from_tools(tools_called: list[dict[str, Any]]) -> list[PoiEn
                     u for u in (entry.get("photo_urls") or [])
                     if isinstance(u, str) and u.startswith(("http://", "https://"))
                 ][:3]
+                loc = entry.get("location") if isinstance(entry.get("location"), dict) else {}
+                lng = entry.get("lng", loc.get("lng"))
+                lat = entry.get("lat", loc.get("lat"))
+                rating = entry.get("rating")
+                cost = entry.get("cost")
                 e = PoiEntry(
                     id=str(entry["id"]),
                     name=str(entry.get("name") or ""),
                     amap_place_url=str(entry.get("amap_place_url") or ""),
                     poi_type=str(entry.get("poi_type") or ""),
                     photo_urls=photos,
+                    lng=float(lng) if lng is not None else None,
+                    lat=float(lat) if lat is not None else None,
+                    rating=float(rating) if rating is not None else None,
+                    cost=str(cost).strip() if cost not in (None, "") else None,
                 )
                 _merge_into(seen, e)
         raw = tc.get("result_preview") or tc.get("result") or ""
@@ -112,10 +166,19 @@ def build_whitelist_from_tools(tools_called: list[dict[str, Any]]) -> list[PoiEn
 
 
 def _merge_into(seen: dict[str, PoiEntry], e: PoiEntry) -> None:
-    """合并同 id POI：保留已有 photo_urls，避免被无图来源覆盖。"""
+    """合并同 id POI：保留已有 photo_urls / 坐标 / 评分，避免被无图来源覆盖。"""
     prev = seen.get(e.id)
-    if prev is not None and not e.photo_urls and prev.photo_urls:
-        e.photo_urls = prev.photo_urls
+    if prev is not None:
+        if not e.photo_urls and prev.photo_urls:
+            e.photo_urls = prev.photo_urls
+        if e.lng is None and prev.lng is not None:
+            e.lng = prev.lng
+        if e.lat is None and prev.lat is not None:
+            e.lat = prev.lat
+        if e.rating is None and prev.rating is not None:
+            e.rating = prev.rating
+        if e.cost is None and prev.cost is not None:
+            e.cost = prev.cost
     seen[e.id] = e
 
 

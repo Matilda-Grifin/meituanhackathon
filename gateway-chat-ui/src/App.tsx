@@ -91,6 +91,28 @@ import {
   labelForTool,
   type ProcessStep,
 } from "./toolProgress";
+import { mapFriendlyProgress } from "./friendlyProgress";
+import { useSessionPois } from "./hooks/useSessionPois";
+import { ThinkingBubble } from "./components/ThinkingBubble";
+import { HistoryDrawer } from "./components/HistoryDrawer";
+import { MobileHeader } from "./components/MobileHeader";
+import { PlanMessageBody } from "./components/PlanMessageBody";
+import { RouteMapPreview } from "./components/RouteMap";
+import { FollowUpChips } from "./components/FollowUpChips";
+import { MobileNotice } from "./components/MobileNotice";
+
+async function waitUntil(
+  timeoutMs: number,
+  fn: () => boolean,
+  stepMs = 150,
+): Promise<boolean> {
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    if (fn()) return true;
+    await new Promise((r) => window.setTimeout(r, stepMs));
+  }
+  return fn();
+}
 
 /** HTTP 非安全上下文中 `crypto.randomUUID()` 会抛错，否则点击 Send 会在 try 之前静默失败 */
 function newIdempotencyKey(): string {
@@ -1201,6 +1223,21 @@ async function pickSessionKeyAfterConnect(
   return null;
 }
 
+/** App 壳：与页面同源 wss，走 8081 Nginx /ws/ 反代 */
+function resolveGatewayUrlForShell(
+  queryGateway: string | null | undefined,
+  storedGateway: string | null | undefined,
+  fromEnv: string,
+): string {
+  const q = queryGateway?.trim();
+  if (q) return q;
+  if (mobileShell && typeof window !== "undefined") {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${window.location.host}/ws/`;
+  }
+  return storedGateway?.trim() || fromEnv || "ws://127.0.0.1:18789";
+}
+
 /** 优先级：URL query > 上次会话 localStorage > Vite 默认（避免 env 固定 key 盖住侧栏里各条独立 session） */
 function loadSettings() {
   const sp = new URLSearchParams(window.location.search);
@@ -1208,11 +1245,11 @@ function loadSettings() {
   const fromEnvToken = envStr("VITE_GATEWAY_TOKEN");
   const fromEnvSession = envStr("VITE_DEFAULT_SESSION_KEY");
   return {
-    gatewayUrl:
-      sp.get("gateway")?.trim() ||
-      localStorage.getItem("gw.url")?.trim() ||
-      fromEnvGateway ||
-      "ws://127.0.0.1:18789",
+    gatewayUrl: resolveGatewayUrlForShell(
+      sp.get("gateway"),
+      localStorage.getItem("gw.url"),
+      fromEnvGateway,
+    ),
     token:
       sp.get("token")?.trim() ||
       hashToken() ||
@@ -1228,6 +1265,7 @@ function loadSettings() {
 }
 
 const compactUi = import.meta.env.VITE_COMPACT_UI === "true";
+const mobileShell = import.meta.env.VITE_APP_SHELL === "mobile";
 const autoConnect = import.meta.env.VITE_AUTO_CONNECT === "true";
 const showDebug = import.meta.env.VITE_SHOW_DEBUG === "true";
 
@@ -1281,6 +1319,10 @@ export default function App() {
   const [streaming, setStreaming] = useState("");
   const [toolSteps, setToolSteps] = useState<ProcessStep[]>([]);
   const [awaitingAgent, setAwaitingAgent] = useState(false);
+  /** 用户发消息后至 chat.final：移动端进度条必须展示 */
+  const [agentReplyPending, setAgentReplyPending] = useState(false);
+  const [minThinkingUntil, setMinThinkingUntil] = useState(0);
+  const [thinkingUiTick, setThinkingUiTick] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [intakeSelections, setIntakeSelections] = useState<Record<number, string>>({});
   const [intakeCustom, setIntakeCustom] = useState<Record<number, string>>({});
@@ -1297,8 +1339,12 @@ export default function App() {
   const [intakeAnchorUserId, setIntakeAnchorUserId] = useState<string | null>(null);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string>("");
+  const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
+  const [mobileNotice, setMobileNotice] = useState("");
   const lastAssistantRowId = useRef<string | null>(null);
   const clientRef = useRef<GatewayBrowserClient | null>(null);
+  const connectedRef = useRef(false);
+  const createThreadPromiseRef = useRef<Promise<void> | null>(null);
   const autoConnectDone = useRef(false);
   const autoReconnectTimerRef = useRef<number | null>(null);
   const connectInFlightRef = useRef(false);
@@ -1820,6 +1866,10 @@ export default function App() {
   }, [rows, streaming, showIntakeCard, intakePhasePending]);
 
   useEffect(() => {
+    connectedRef.current = connected;
+  }, [connected]);
+
+  useEffect(() => {
     rowsRef.current = rows;
     if (
       pendingUserDisplay &&
@@ -1932,6 +1982,29 @@ export default function App() {
     return toolSteps;
   }, [hasVisibleUserMessage, suppressToolProgress, toolSteps]);
 
+  const sessionPoisRefreshKey = toolSteps.length + rows.length;
+  const sessionPois = useSessionPois(sessionKey, sessionPoisRefreshKey);
+
+  const lastUserText = useMemo(() => lastUserTextInRows(rows), [rows]);
+
+  const isFollowUpTurn = useMemo(() => {
+    let userCount = 0;
+    for (const r of rows) {
+      if (isVisibleUserRow(r) && !isIntakeSubmissionText(r.text)) userCount++;
+    }
+    return userCount > 1 || (!!pendingUserDisplay && userCount >= 1);
+  }, [rows, pendingUserDisplay]);
+
+  const lastVisibleAssistantRowId = useMemo(() => {
+    for (let i = displayRows.length - 1; i >= 0; i--) {
+      const r = displayRows[i]!;
+      if (String(r.role).toLowerCase() === "assistant" && !isHiddenChatRow("assistant", r.text)) {
+        return r.id;
+      }
+    }
+    return "";
+  }, [displayRows]);
+
   /** A 阶段已发 user、问卷尚未挂载：对话区展示加载态（避免 read 后 10～20s 全黑） */
   const showIntakeLoading = useMemo(
     () =>
@@ -1949,6 +2022,44 @@ export default function App() {
       hasVisibleUserMessage,
       awaitingAgent,
       visibleToolSteps.length,
+    ],
+  );
+
+  const friendlyThinking = useMemo(
+    () =>
+      mobileShell
+        ? mapFriendlyProgress({
+            visibleToolSteps,
+            awaitingAgent,
+            agentReplyPending,
+            isFollowUpTurn,
+            intakeActive,
+            intakeLocked,
+            intakePhasePending,
+            showIntakeLoading,
+            imageGenPending,
+            connected,
+            hasVisibleUserMessage,
+            streaming: streaming.trim().length > 0,
+            lastUserText: lastUserText ?? "",
+            resolvedLocation,
+          })
+        : null,
+    [
+      visibleToolSteps,
+      awaitingAgent,
+      agentReplyPending,
+      isFollowUpTurn,
+      intakeActive,
+      intakeLocked,
+      intakePhasePending,
+      showIntakeLoading,
+      imageGenPending,
+      connected,
+      hasVisibleUserMessage,
+      streaming,
+      lastUserText,
+      resolvedLocation,
     ],
   );
 
@@ -1984,6 +2095,60 @@ export default function App() {
     [streaming, ackFlushedTick, pinnedSkipIntakeAck],
   );
 
+  const formalContentStarted = useMemo(() => {
+    if (Date.now() < minThinkingUntil) return false;
+    if (showIntakeCard && displayIntakeBlocksResolved.length > 0 && !intakeLocked) return true;
+    const st = streaming.trim();
+    if (st && isIntakeQuestionBubble(st)) return true;
+    if (!showLiveBubble) return false;
+    const live = liveStreamText.trim();
+    if (!live || isNoiseAssistantBubble(live) || isRawToolPayloadText(live)) return false;
+    if (live.length < 48) return false;
+    if (isPlanMessage(live)) return true;
+    if (live.length >= 96) return true;
+    return false;
+  }, [
+    minThinkingUntil,
+    thinkingUiTick,
+    showIntakeCard,
+    displayIntakeBlocksResolved.length,
+    intakeLocked,
+    streaming,
+    showLiveBubble,
+    liveStreamText,
+  ]);
+
+  const thinkingDisplay = friendlyThinking ?? { main: "✍️ 攻略制定中…" };
+
+  const wantMobileThinking = useMemo(
+    () =>
+      mobileShell &&
+      !intakeActive &&
+      !formalContentStarted &&
+      (agentReplyPending ||
+        showIntakeLoading ||
+        imageGenPending ||
+        awaitingAgent ||
+        visibleToolSteps.length > 0),
+    [
+      mobileShell,
+      intakeActive,
+      formalContentStarted,
+      agentReplyPending,
+      showIntakeLoading,
+      imageGenPending,
+      awaitingAgent,
+      visibleToolSteps.length,
+    ],
+  );
+
+  useEffect(() => {
+    if (!agentReplyPending) return;
+    const wait = Math.max(0, minThinkingUntil - Date.now());
+    const t = window.setTimeout(() => setThinkingUiTick((n) => n + 1), wait + 40);
+    return () => window.clearTimeout(t);
+  }, [agentReplyPending, minThinkingUntil]);
+
   useEffect(() => {
     const el = streamScrollRef.current;
     if (!el) return;
@@ -2016,10 +2181,7 @@ export default function App() {
 
   useEffect(() => {
     if (!awaitingAgent || !lastUserBubble) return;
-    // B 阶段（口语跳过 / 已提交选择题）：不在首条非 intake 文本时结束 awaiting，等 chat.final
-    if (intakeViaFreetextRef.current || intakeLocked) {
-      return;
-    }
+    if (intakeViaFreetextRef.current || intakeLocked) return;
     const userIdx = rows.findIndex((r) => r.id === lastUserBubble.id);
     if (userIdx < 0) return;
     for (let i = rows.length - 1; i > userIdx; i--) {
@@ -2030,11 +2192,7 @@ export default function App() {
       }
       break;
     }
-    const live = streaming.trim();
-    if (live.length > 12 && !isIntakeQuestionBubble(live)) {
-      setAwaitingAgent(false);
-    }
-  }, [rows, streaming, awaitingAgent, lastUserBubble, intakeLocked]);
+  }, [rows, awaitingAgent, lastUserBubble, intakeLocked]);
 
   useEffect(() => {
     if (threadsBootstrapped.current) return;
@@ -2586,6 +2744,7 @@ export default function App() {
       setHello(null);
       setToolSteps([]);
       setAwaitingAgent(false);
+      setAgentReplyPending(false);
       setStreaming("");
       autoSessionTried.current = false;
     }
@@ -2624,6 +2783,7 @@ export default function App() {
         wasEverConnectedRef.current = true;
         setWasEverConnected(true);
         setHello(h);
+        connectedRef.current = true;
         setConnected(true);
         setStatus("connected");
         pushLog(`hello protocol=${h.protocol} server=${h.server?.version ?? "?"}`);
@@ -2744,6 +2904,7 @@ export default function App() {
             toolStartedThisRunRef.current = false;
             setAckFlushedTick((t) => t + 1);
             setAwaitingAgent(false);
+            setAgentReplyPending(false);
             stopHistoryPollRef.current();
             void refreshHistoryRef.current({ keepOnEmpty: true });
             // ===== 时序评测：延迟持久化，等 rows 更新完成 =====
@@ -2800,6 +2961,7 @@ export default function App() {
       },
       onClose: ({ code, reason, error }) => {
         connectInFlightRef.current = false;
+        connectedRef.current = false;
         const extra = error ? ` ${error.code}: ${error.message}` : "";
         const mixed =
           code === 1006 && insecureWsFromSecurePage(ws)
@@ -2808,11 +2970,9 @@ export default function App() {
         const raw = `closed ${code} ${reason}${extra}${mixed}`;
         pushLog(`close ${raw}`);
         if (compactUi && autoConnect && appEnabled) {
-          if (!wasEverConnectedRef.current) {
-            setConnected(false);
-            setHello(null);
-          }
-          setStatus("disconnected");
+          setConnected(false);
+          setHello(null);
+          setStatus(mobileShell && !wasEverConnectedRef.current ? "disconnected" : "disconnected");
           if (autoReconnectTimerRef.current == null) {
             autoReconnectTimerRef.current = window.setTimeout(() => {
               autoReconnectTimerRef.current = null;
@@ -2935,14 +3095,14 @@ export default function App() {
   const handleLocationAgree = useCallback(async () => {
     setLocationBusy(true);
     setLocationError("");
+    // 先授权并触发 autoConnect，定位在后台拉取（与 Web 端一致，不阻塞 Gateway 握手）
+    storeLocationConsent();
+    setLocationConsent("granted");
     try {
       const loc = await refreshUserLocation();
       if (!loc) {
-        setLocationError("未能获取位置（请检查网络或稍后重试）。若持续失败，可刷新页面重试。");
-        return;
+        setLocationError("未能获取位置（规划仍可继续，稍后可重试）。");
       }
-      storeLocationConsent();
-      setLocationConsent("granted");
     } catch (e) {
       setLocationError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -3020,7 +3180,12 @@ export default function App() {
   const sendMessage = useCallback(
     async (
       text: string,
-      opts?: { displayText?: string; hideVisibleUser?: boolean; intakeSkipped?: boolean },
+      opts?: {
+        displayText?: string;
+        hideVisibleUser?: boolean;
+        intakeSkipped?: boolean;
+        userAlreadyShown?: boolean;
+      },
     ) => {
       const c = clientRef.current;
       let msg = text.trim();
@@ -3028,7 +3193,8 @@ export default function App() {
       if (!appEnabled || !c?.connected || !msg) return;
       if (isLocationContextMessage(msg)) return;
       if (isWarmupMessage(msg)) return;
-      if (!sessionKey.trim()) {
+      const sk = sessionKeyRef.current.trim();
+      if (!sk) {
         setStatus("session key required");
         return;
       }
@@ -3079,7 +3245,6 @@ export default function App() {
       // ===== 时序评测结束 =====
       setAckFlushedTick((t) => t + 1);
       const idem = newIdempotencyKey();
-      const sk = sessionKey.trim();
 
       if (
         !opts?.hideVisibleUser &&
@@ -3091,7 +3256,7 @@ export default function App() {
       }
 
       optimisticUserRef.current = msg;
-      if (!opts?.hideVisibleUser) {
+      if (!opts?.hideVisibleUser && !opts?.userAlreadyShown) {
         const userRow: ChatRow = {
           role: "user",
           text: userVisible,
@@ -3107,6 +3272,9 @@ export default function App() {
       }
       setStreaming("");
       setAwaitingAgent(true);
+      setAgentReplyPending(true);
+      setMinThinkingUntil(Date.now() + 750);
+      setThinkingUiTick((n) => n + 1);
       setToolSteps(() =>
         appendProcessStep(
           [],
@@ -3144,7 +3312,7 @@ export default function App() {
       });
       try {
         const ack = await c.request("chat.send", {
-          sessionKey: sessionKey.trim(),
+          sessionKey: sk,
           message: msg,
           idempotencyKey: idem,
         });
@@ -3156,7 +3324,7 @@ export default function App() {
         ) {
           lastInjectedLocationKeyRef.current.set(sk, locationSnapshotKey(resolvedLocation));
         }
-        void notifyHarnessUserMessage(sessionKey.trim(), msg, {
+        void notifyHarnessUserMessage(sk, msg, {
           intakeSkipped: !!opts?.intakeSkipped,
         });
         setStatus("connected · sent");
@@ -3179,8 +3347,10 @@ export default function App() {
         startHistoryPoll();
       } catch (e) {
         setAwaitingAgent(false);
-        setPendingUserDisplay(null);
-        setStatus(`chat.send failed: ${formatRpcError(e)}`);
+        setAgentReplyPending(false);
+        const err = `发送失败：${formatRpcError(e)}`;
+        setStatus(err);
+        if (mobileShell) setMobileNotice(err);
       }
     },
     [
@@ -3272,33 +3442,6 @@ export default function App() {
     await sendMessage(apiText, { hideVisibleUser: true });
   }, [frozenIntake, intakeBlocks, intakeCustom, intakeFollowUp, intakeSelections, lockIntakeSnapshot, sendMessage]);
 
-  const send = useCallback(async () => {
-    const text = draft.trim();
-    if (!text) return;
-    const blocks = frozenIntake ?? intakeBlocks;
-    const intakeOpen =
-      !intakeLocked && blocks.length > 0 && !intakeAnswerComplete(blocks, intakeSelections, intakeCustom, intakeFollowUp);
-    if (intakeOpen) {
-      // 口语路径：用户原句只进右侧气泡，绝不写入卡片内 Other 输入框
-      lockIntakeSnapshot({ blocks, selections: {}, custom: {}, followUp: {} }, true);
-      setDraft("");
-      await sendMessage(text, { intakeSkipped: true });
-      return;
-    }
-    setDraft("");
-    await sendMessage(text);
-  }, [
-    draft,
-    frozenIntake,
-    intakeBlocks,
-    intakeCustom,
-    intakeFollowUp,
-    intakeLocked,
-    intakeSelections,
-    lockIntakeSnapshot,
-    sendMessage,
-  ]);
-
   const abort = useCallback(async () => {
     const c = clientRef.current;
     if (!c?.connected || !sessionKey.trim()) return;
@@ -3324,6 +3467,7 @@ export default function App() {
       lastHistorySessionRef.current = "";
       setStreaming("");
       setAwaitingAgent(false);
+      setAgentReplyPending(false);
       setToolSteps([]);
       warmupInFlightRef.current = false;
       warmupPromiseRef.current = null;
@@ -3345,79 +3489,207 @@ export default function App() {
     [activeThreadId, clearIntakeUi, detachInactiveSession, historyLoading, sessionKey, threads, stopHistoryPoll],
   );
 
-  const createNewThread = useCallback(async () => {
-    if (creatingThread) return;
-    const c = clientRef.current;
-    if (!c?.connected) {
-      pendingNewThreadRef.current = true;
-      setStatus("连接中，连接成功后将自动新建对话…");
-      connect();
-      return;
-    }
-    pendingNewThreadRef.current = false;
-    setCreatingThread(true);
-    const oldSk = sessionKey.trim();
-    if (oldSk) {
-      await detachInactiveSession(oldSk);
-    }
-    stopHistoryPoll();
-    setStreaming("");
-    optimisticUserRef.current = null;
-    setPendingUserDisplay(null);
-    clearIntakeUi();
-    rowsRef.current = [];
-    warmupInFlightRef.current = false;
-    warmupPromiseRef.current = null;
-    warmupResolveRef.current?.();
-    warmupResolveRef.current = null;
-    warmupStateRef.current = "idle";
-    try {
-      const newKey = await allocateWebchatSessionKey(c, pushLog, {
-        label: `webchat-${getOrCreateDeviceId().slice(0, 24)}-${new Date().toISOString().slice(0, 16)}`,
-      });
-      const id = "t-" + Date.now().toString(36);
-      const snapModelId = currentModelIdRef.current;
-      const nt: ChatThread = {
-        id,
-        sessionKey: newKey,
-        title: "新对话",
-        updatedAt: Date.now(),
-        modelId: snapModelId,
+  const createNewThread = useCallback(
+    async (opts?: { preserveChat?: boolean }) => {
+      if (createThreadPromiseRef.current) {
+        return createThreadPromiseRef.current;
+      }
+
+      const run = async () => {
+        const c = clientRef.current;
+        if (!c?.connected) {
+          pendingNewThreadRef.current = true;
+          setStatus("连接中，连接成功后将自动新建对话…");
+          connect();
+          const linked = await waitUntil(12000, () => connectedRef.current && !!clientRef.current?.connected);
+          if (!linked) return;
+        }
+        pendingNewThreadRef.current = false;
+        setCreatingThread(true);
+        const oldSk = sessionKey.trim();
+        if (oldSk) {
+          await detachInactiveSession(oldSk);
+        }
+        stopHistoryPoll();
+        setStreaming("");
+        if (!opts?.preserveChat && !rowsRef.current.some((r) => isVisibleUserRow(r))) {
+          optimisticUserRef.current = null;
+          setPendingUserDisplay(null);
+          clearIntakeUi();
+          rowsRef.current = [];
+          setRows([]);
+        }
+        warmupInFlightRef.current = false;
+        warmupPromiseRef.current = null;
+        warmupResolveRef.current?.();
+        warmupResolveRef.current = null;
+        warmupStateRef.current = "idle";
+        try {
+          const client = clientRef.current;
+          if (!client?.connected) return;
+          const newKey = await allocateWebchatSessionKey(client, pushLog, {
+            label: `webchat-${getOrCreateDeviceId().slice(0, 24)}-${new Date().toISOString().slice(0, 16)}`,
+          });
+          const id = "t-" + Date.now().toString(36);
+          const snapModelId = currentModelIdRef.current;
+          const nt: ChatThread = {
+            id,
+            sessionKey: newKey,
+            title: "新对话",
+            updatedAt: Date.now(),
+            modelId: snapModelId,
+          };
+          historyLoadGen.current += 1;
+          lastHistorySessionRef.current = "";
+          setThreads((prev) => {
+            const merged = [...prev, nt];
+            saveThreads(merged);
+            return merged;
+          });
+          setActiveThreadId(id);
+          localStorage.setItem(ACTIVE_THREAD_LS, id);
+          localStorage.setItem("gw.session", newKey);
+          setSessionKey(newKey);
+          sessionKeyRef.current = newKey.trim();
+          if (!opts?.preserveChat) {
+            setRows([]);
+            rowsRef.current = [];
+          }
+          evalTurnIndexRef.current = 0;
+          intakeShownLoggedRef.current = false;
+          intakeSubmittedLoggedRef.current = false;
+          lastToolProgressCountRef.current = 0;
+          imageGenStartRef.current = null;
+          imageGenSuppressedRef.current = false;
+          lastImagePlanFpRef.current = "";
+          setStatus("已新建对话");
+          void logEvalEvent("session_start", {
+            taskId: evalTaskIdRef.current,
+            newThread: true,
+            modelId: snapModelId,
+          });
+        } catch (e) {
+          pushLog(`createNewThread ${formatRpcError(e)}`);
+          setStatus(`新建对话失败：${formatRpcError(e)}`);
+          if (mobileShell) setMobileNotice(`新建对话失败：${formatRpcError(e)}`);
+        } finally {
+          setCreatingThread(false);
+        }
       };
-      historyLoadGen.current += 1;
-      lastHistorySessionRef.current = "";
-      setThreads((prev) => {
-        const merged = [...prev, nt];
-        saveThreads(merged);
-        return merged;
-      });
-      setActiveThreadId(id);
-      localStorage.setItem(ACTIVE_THREAD_LS, id);
-      localStorage.setItem("gw.session", newKey);
-      setSessionKey(newKey);
-      sessionKeyRef.current = newKey.trim();
-      setRows([]);
-      rowsRef.current = [];
-      evalTurnIndexRef.current = 0;
-      intakeShownLoggedRef.current = false;
-      intakeSubmittedLoggedRef.current = false;
-      lastToolProgressCountRef.current = 0;
-      imageGenStartRef.current = null;
-      imageGenSuppressedRef.current = false;
-      lastImagePlanFpRef.current = "";
-      setStatus("已新建对话");
-      void logEvalEvent("session_start", {
-        taskId: evalTaskIdRef.current,
-        newThread: true,
-        modelId: snapModelId,
-      });
-    } catch (e) {
-      pushLog(`createNewThread ${formatRpcError(e)}`);
-      setStatus(`新建对话失败：${formatRpcError(e)}`);
-    } finally {
-      setCreatingThread(false);
+
+      const p = run();
+      createThreadPromiseRef.current = p;
+      try {
+        await p;
+      } finally {
+        if (createThreadPromiseRef.current === p) {
+          createThreadPromiseRef.current = null;
+        }
+      }
+    },
+    [clearIntakeUi, connect, detachInactiveSession, logEvalEvent, mobileShell, pushLog, sessionKey, stopHistoryPoll],
+  );
+
+  const ensureGatewayConnected = useCallback(async (): Promise<boolean> => {
+    if (connectedRef.current && clientRef.current?.connected) return true;
+    if (!connectInFlightRef.current) connect();
+    let ok = await waitUntil(12000, () => connectedRef.current && !!clientRef.current?.connected);
+    if (ok) return true;
+    connectInFlightRef.current = false;
+    if (autoReconnectTimerRef.current != null) {
+      window.clearTimeout(autoReconnectTimerRef.current);
+      autoReconnectTimerRef.current = null;
     }
-  }, [clearIntakeUi, connect, creatingThread, detachInactiveSession, logEvalEvent, pushLog, sessionKey, stopHistoryPoll]);
+    connect();
+    ok = await waitUntil(8000, () => connectedRef.current && !!clientRef.current?.connected);
+    return ok;
+  }, [connect]);
+
+  const sendUserText = useCallback(
+    async (rawText: string) => {
+      const text = rawText.trim();
+      if (!text || !appEnabled) return;
+
+      const bumpNotice = (msg: string) => {
+        setStatus(msg);
+        if (mobileShell) setMobileNotice(msg);
+      };
+
+      const idem = newIdempotencyKey();
+      const userId = `u-${idem}`;
+      const userVisible = text;
+
+      setPendingUserDisplay({ id: userId, text: userVisible });
+      setRows((r) => {
+        const next: ChatRow[] = [
+          ...r,
+          { role: "user", text: userVisible, id: userId, timestamp: Date.now() },
+        ];
+        rowsRef.current = next;
+        return next;
+      });
+
+      if (!connectedRef.current || !clientRef.current?.connected) {
+        bumpNotice("正在连接服务器…");
+        const linked = await ensureGatewayConnected();
+        if (!linked) {
+          bumpNotice("连接失败，请刷新页面后重试");
+          return;
+        }
+      }
+
+      let sk = sessionKeyRef.current.trim();
+      if (!sk) {
+        bumpNotice("正在创建对话…");
+        await createNewThread({ preserveChat: true });
+        await waitUntil(15000, () => !!sessionKeyRef.current.trim());
+        sk = sessionKeyRef.current.trim();
+        if (!sk) {
+          bumpNotice("会话未就绪，请稍后再试");
+          return;
+        }
+      }
+
+      if (mobileShell) setMobileNotice("");
+
+      const blocks = frozenIntake ?? intakeBlocks;
+      const intakeOpen =
+        !intakeLocked &&
+        blocks.length > 0 &&
+        !intakeAnswerComplete(blocks, intakeSelections, intakeCustom, intakeFollowUp);
+      if (intakeOpen) {
+        lockIntakeSnapshot({ blocks, selections: {}, custom: {}, followUp: {} }, true);
+        await sendMessage(text, {
+          intakeSkipped: true,
+          userAlreadyShown: true,
+          displayText: userVisible,
+        });
+        return;
+      }
+      await sendMessage(text, { userAlreadyShown: true, displayText: userVisible });
+    },
+    [
+      appEnabled,
+      createNewThread,
+      ensureGatewayConnected,
+      frozenIntake,
+      intakeBlocks,
+      intakeCustom,
+      intakeFollowUp,
+      intakeLocked,
+      intakeSelections,
+      lockIntakeSnapshot,
+      mobileShell,
+      sendMessage,
+    ],
+  );
+
+  const send = useCallback(async () => {
+    const text = draft.trim();
+    if (!text || !appEnabled) return;
+    setDraft("");
+    await sendUserText(text);
+  }, [appEnabled, draft, sendUserText]);
 
   const clearAllLocalHistory = useCallback(() => {
     stopHistoryPoll();
@@ -3451,7 +3723,7 @@ export default function App() {
     if (threads.length > 0 || sessionKey.trim()) return;
     if (firstSessionCreating.current) return;
     firstSessionCreating.current = true;
-    void createNewThread().finally(() => {
+    void createNewThread({ preserveChat: rowsRef.current.some((r) => isVisibleUserRow(r)) }).finally(() => {
       firstSessionCreating.current = false;
     });
   }, [connected, hello, threads.length, sessionKey, createNewThread]);
@@ -3480,10 +3752,23 @@ export default function App() {
     void refreshHistory({ sessionKeyOverride: sk });
   }, [connected, hello, sessionKey, refreshHistory]);
 
+  useEffect(() => {
+    if (!mobileShell || !appEnabled) return;
+    if (connected) {
+      setMobileNotice((m) => (m === "正在连接…" || m === "正在连接服务器…" ? "" : m));
+      return;
+    }
+    if (status === "connecting…" || status === "reconnecting…") {
+      setMobileNotice("正在连接…");
+    }
+  }, [mobileShell, appEnabled, connected, status]);
+
   useEffect(() => () => disconnect(), [disconnect]);
 
   const displayStatus = userFacingStatus(status, connected);
   const uiLocked = !appEnabled;
+  const draftReady = draft.trim().length > 0;
+  const canSendDraft = draftReady && appEnabled && connected && !creatingThread;
 
   const cardAnchorUserId = useMemo(
     () => sessionPlanningIntake?.anchorId ?? intakeAnchorUserId ?? findIntakeCardAnchorUserId(rows),
@@ -3537,7 +3822,10 @@ export default function App() {
   }, [appEnabled, connected, resolvedLocation, refreshUserLocation]);
 
   return (
-    <div className={`app${compactUi ? " compact-mode" : ""}${uiLocked ? " app-locked" : ""}`}>
+    <div className={mobileShell ? "app-mobile-viewport" : undefined}>
+    <div
+      className={`app${compactUi ? " compact-mode" : ""}${mobileShell ? " app-mobile" : ""}${uiLocked ? " app-locked" : ""}`}
+    >
       <LocationConsentModal
         open={showLocationConsent}
         busy={locationBusy}
@@ -3550,6 +3838,32 @@ export default function App() {
           您未同意位置授权，本页功能已停用。请刷新页面后点击「同意」以继续使用。
         </div>
       ) : null}
+      {mobileShell ? <MobileHeader onMenu={() => setHistoryDrawerOpen(true)} /> : null}
+      {mobileShell ? (
+        <HistoryDrawer
+          open={historyDrawerOpen}
+          threads={threads}
+          activeThreadId={activeThreadId}
+          creatingThread={creatingThread}
+          uiLocked={uiLocked}
+          onClose={() => setHistoryDrawerOpen(false)}
+          onSelect={(id) => {
+            setHistoryDrawerOpen(false);
+            void switchThread(id);
+          }}
+          onNew={() => {
+            setHistoryDrawerOpen(false);
+            void createNewThread();
+          }}
+          onClear={() => {
+            if (window.confirm("清空本机侧栏记录并新建专属会话？其他设备上的记录不受影响。")) {
+              setHistoryDrawerOpen(false);
+              void clearAllLocalHistory();
+            }
+          }}
+        />
+      ) : null}
+      {!mobileShell ? (
       <header className="header">
         <h1>{compactUi ? "美团本地生活 · 出行管家" : "Gateway chat (custom layout)"}</h1>
         {appEnabled ? (
@@ -3597,7 +3911,7 @@ export default function App() {
             同一主机打开本页，或为网关配置 <strong>wss://</strong>（如 Nginx/Caddy 反代 18789）。
           </p>
         ) : null}
-        {compactUi && appEnabled ? (
+        {compactUi && appEnabled && !mobileShell ? (
           <div className="model-selector">
             <select
               className="model-select"
@@ -3619,8 +3933,10 @@ export default function App() {
           </div>
         ) : null}
       </header>
+      ) : null}
 
       <div className="main-layout">
+        {!mobileShell ? (
         <aside className="sidebar" aria-label="历史对话">
           <div className="sidebar-head">
             <span className="sidebar-title">历史对话</span>
@@ -3680,6 +3996,7 @@ export default function App() {
               ))}
           </ul>
         </aside>
+        ) : null}
 
         <div className="main-col">
       {!compactUi ? (
@@ -3750,10 +4067,13 @@ export default function App() {
             type StreamItem =
               | { kind: "bubble"; key: string; node: ReactNode }
               | { kind: "intake-card"; key: string; node: ReactNode }
-              | { kind: "pending-user"; key: string; node: ReactNode };
+              | { kind: "pending-user"; key: string; node: ReactNode }
+              | { kind: "thinking"; key: string; node: ReactNode }
+              | { kind: "extras"; key: string; node: ReactNode };
 
             const items: StreamItem[] = [];
             let cardInserted = false;
+            let lastUserBubbleKey: string | null = null;
 
             const pushIntakeCard = () => {
               if (!intakeCardEl || cardInserted) return;
@@ -3777,21 +4097,67 @@ export default function App() {
               const userBubbleText =
                 rl === "user" ? extractUserVisibleTextFromMessage(r.text) : r.text;
               if (rl === "user" && !userBubbleText.trim()) continue;
+              if (rl === "user") lastUserBubbleKey = r.id;
+
+              const isPlan = rl === "assistant" && isPlanMessage(r.text);
 
               items.push({
                 kind: "bubble",
                 key: r.id,
                 node: (
                   <div className={`bubble-row ${rl === "user" ? "bubble-row-user" : "bubble-row-assistant"}`}>
-                    <div className={`bubble role-${rl}`}>
-                      {rl !== "user" ? <div className="role">{rl}</div> : null}
+                    <div
+                      className={`bubble role-${rl}${mobileShell && isPlan ? " bubble-plan" : ""}`}
+                    >
+                      {!mobileShell && rl !== "user" ? <div className="role">{rl}</div> : null}
                       <MarkdownErrorBoundary text={userBubbleText}>
-                        <BubbleMarkdown text={userBubbleText} />
+                        {mobileShell && isPlan ? (
+                          <PlanMessageBody
+                            text={userBubbleText}
+                            pois={sessionPois}
+                            userLocation={resolvedLocation}
+                          />
+                        ) : (
+                          <BubbleMarkdown text={userBubbleText} />
+                        )}
                       </MarkdownErrorBoundary>
                     </div>
                   </div>
                 ),
               });
+
+              if (mobileShell && isPlan) {
+                items.push({
+                  kind: "extras",
+                  key: `${r.id}-map`,
+                  node: (
+                    <RouteMapPreview
+                      pois={sessionPois}
+                      userLng={resolvedLocation?.lng}
+                      userLat={resolvedLocation?.lat}
+                    />
+                  ),
+                });
+              }
+
+              if (
+                mobileShell &&
+                rl === "assistant" &&
+                r.id === lastVisibleAssistantRowId &&
+                !awaitingAgent &&
+                !intakeActive
+              ) {
+                items.push({
+                  kind: "extras",
+                  key: `${r.id}-chips`,
+                  node: (
+                    <FollowUpChips
+                      disabled={uiLocked || !connected}
+                      onPick={(text) => void sendUserText(text)}
+                    />
+                  ),
+                });
+              }
 
               if (rl === "user" && cardAnchorUserId != null && cardAnchorUserId === r.id) {
                 pushIntakeCard();
@@ -3815,6 +4181,7 @@ export default function App() {
               pendingUserDisplay &&
               !displayRows.some((r) => r.id === pendingUserDisplay.id)
             ) {
+              lastUserBubbleKey = pendingUserDisplay.id;
               items.push({
                 kind: "pending-user",
                 key: pendingUserDisplay.id,
@@ -3830,24 +4197,69 @@ export default function App() {
               });
             }
 
+            if (wantMobileThinking) {
+              const thinkingItem: StreamItem = {
+                kind: "thinking",
+                key: "thinking-live",
+                node: (
+                  <div className="bubble-row bubble-row-assistant">
+                    <ThinkingBubble
+                      main={thinkingDisplay.main}
+                      sub={thinkingDisplay.sub}
+                      visible={wantMobileThinking}
+                    />
+                  </div>
+                ),
+              };
+              let insertAt = items.length;
+              if (cardInserted && intakeLocked) {
+                const cardIdx = items.findIndex((it) => it.kind === "intake-card");
+                if (cardIdx >= 0) insertAt = cardIdx + 1;
+              } else if (lastUserBubbleKey) {
+                const userIdx = items.findIndex(
+                  (it) =>
+                    (it.kind === "bubble" || it.kind === "pending-user") &&
+                    it.key === lastUserBubbleKey,
+                );
+                if (userIdx >= 0) insertAt = userIdx + 1;
+              }
+              items.splice(insertAt, 0, thinkingItem);
+            }
+
             return items.map((it) => <Fragment key={it.key}>{it.node}</Fragment>);
           })()}
           {showLiveBubble &&
           liveStreamText.trim() &&
           !isNoiseAssistantBubble(liveStreamText) &&
           !isRawToolPayloadText(liveStreamText) ? (
-            <div className="bubble role-assistant streaming">
-              <div className="role">live</div>
+            <div
+              className={`bubble-row bubble-row-assistant`}
+            >
+              <div
+                className={`bubble role-assistant streaming${
+                  mobileShell && !intakePhasePending && !isIntakeQuestionBubble(liveStreamText)
+                    ? " bubble-plan"
+                    : ""
+                }`}
+              >
+              {!mobileShell ? <div className="role">live</div> : null}
               <MarkdownErrorBoundary text={liveStreamText}>
-                {shouldStreamMarkdown(liveStreamText) ? (
+                {mobileShell && isPlanMessage(liveStreamText) ? (
+                  <PlanMessageBody
+                    text={liveStreamText}
+                    pois={sessionPois}
+                    userLocation={resolvedLocation}
+                  />
+                ) : shouldStreamMarkdown(liveStreamText) ? (
                   <StreamingMarkdown text={liveStreamText} />
                 ) : (
                   <StreamingPlainText text={liveStreamText} />
                 )}
               </MarkdownErrorBoundary>
+              </div>
             </div>
           ) : null}
-          {showIntakeLoading ? (
+          {showIntakeLoading && !mobileShell ? (
             <div className="bubble role-assistant typing-bubble" aria-live="polite">
               <div className="role">assistant</div>
               <p className="typing-line">
@@ -3865,7 +4277,8 @@ export default function App() {
           ) : null}
         </div>
         <div className="composer">
-          {appEnabled && wasEverConnected ? (
+          {mobileShell ? <MobileNotice message={mobileNotice} /> : null}
+          {appEnabled && wasEverConnected && !mobileShell ? (
             <div className="process-log" ref={processLogRef} aria-label="任务进展与工具调用">
               <div className="process-log-title">任务进展 · 工具调用</div>
               {!connected ? (
@@ -3894,15 +4307,19 @@ export default function App() {
               在下方输入口语回复后 Enter 发送；发送后问卷全部置灰，您的句子会像首句一样显示在右侧，Agent 随即开始规划。
             </p>
           ) : null}
-          <div className="composer-input-row">
+          <div className={`composer-input-row${mobileShell ? " composer-mobile" : ""}`}>
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              rows={3}
+              rows={mobileShell ? 1 : 3}
               placeholder={
-                showIntakeCard && !intakeLocked
-                  ? "用口语回答即可，如：我们3个人，地铁出行，不忌口…"
-                  : "Enter 发送，Shift+Enter 换行"
+                mobileShell
+                  ? showIntakeCard && !intakeLocked
+                    ? "用口语回答即可，如：我们3个人，地铁出行…"
+                    : "有什么想调整的？"
+                  : showIntakeCard && !intakeLocked
+                    ? "用口语回答即可，如：我们3个人，地铁出行，不忌口…"
+                    : "Enter 发送，Shift+Enter 换行"
               }
               disabled={uiLocked}
               onKeyDown={(e) => {
@@ -3914,13 +4331,23 @@ export default function App() {
             />
             <button
               type="button"
-              className="send"
+              className={`send${mobileShell && draftReady ? " send-ready" : ""}${canSendDraft ? " send-active" : ""}`}
               onClick={() => void send()}
-              disabled={!connected || uiLocked}
+              disabled={!canSendDraft}
+              title={
+                !connected
+                  ? "连接中…"
+                  : creatingThread
+                    ? "初始化会话…"
+                    : !draftReady
+                      ? "请输入内容"
+                      : undefined
+              }
             >
-              Send
+              {mobileShell ? "发送" : "Send"}
             </button>
           </div>
+          {mobileShell ? <p className="ai-disclaimer">内容由 AI 生成</p> : null}
         </div>
       </main>
 
@@ -3933,6 +4360,7 @@ export default function App() {
         </div>
       </div>
 
+    </div>
     </div>
   );
 }

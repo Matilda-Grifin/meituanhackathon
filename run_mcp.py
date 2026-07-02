@@ -163,19 +163,28 @@ def lifecare_plan_route(
     origin_lat: float,
     dest_lng: float,
     dest_lat: float,
+    mode: str = "walking",
 ) -> str:
-    """高德驾车路径规划：距离(米)、时间(秒)、出租车参考价（若有）。"""
+    """高德路径规划：距离(米)、时间(秒)。mode=walking（默认）或 driving。"""
     args = {
         "origin_lng": origin_lng,
         "origin_lat": origin_lat,
         "dest_lng": dest_lng,
         "dest_lat": dest_lat,
+        "mode": mode,
     }
     holder: dict[str, Any] = {}
 
     def _execute() -> str:
-        with tool_span("lifecare_plan_route", {}, result_holder=holder):
-            data = amap_client.plan_route_driving(origin_lng, origin_lat, dest_lng, dest_lat)
+        with tool_span("lifecare_plan_route", {"mode": mode}, result_holder=holder):
+            if (mode or "walking").lower() == "driving":
+                data = amap_client.plan_route_driving(
+                    origin_lng, origin_lat, dest_lng, dest_lat
+                )
+            else:
+                data = amap_client.plan_route_walking(
+                    origin_lng, origin_lat, dest_lng, dest_lat
+                )
             out = json.dumps(data, ensure_ascii=False)
             holder["result"] = out
             return out

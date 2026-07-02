@@ -1,16 +1,22 @@
-import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MermaidBlock } from "./MermaidBlock";
 import { isMermaidFenceComplete } from "./markdownUtils";
 
-export function BubbleMarkdown({ text }: { text: string }): ReactNode {
+export function BubbleMarkdown({
+  text,
+  variant = "default",
+}: {
+  text: string;
+  variant?: "default" | "app-light";
+}) {
   const src = text.replace(/\r\n/g, "\n");
   if (!src.trim()) return null;
   const mermaidOk = isMermaidFenceComplete(src);
+  const light = variant === "app-light";
 
   return (
-    <div className="md-body markdown-body">
+    <div className={`md-body markdown-body${light ? " markdown-body--app-light" : ""}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -44,7 +50,7 @@ export function BubbleMarkdown({ text }: { text: string }): ReactNode {
                   </pre>
                 );
               }
-              return <MermaidBlock code={body} />;
+              return <MermaidBlock code={body} theme={light ? "light" : "dark"} />;
             }
             if (className) {
               return <code className={className}>{children}</code>;

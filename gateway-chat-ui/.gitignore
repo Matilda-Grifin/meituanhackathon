@@ -9,11 +9,13 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-app
 dist-ssr
 *.local
 
 # 生产构建注入的网关 token 等（勿提交）
 .env.production
+.env.app
 .env.local
 .env.*.local
 

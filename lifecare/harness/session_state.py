@@ -220,6 +220,11 @@ def record_tool_call(
                     "amap_place_url": p.amap_place_url,
                     "poi_type": p.poi_type,
                     "photo_urls": p.photo_urls,
+                    "location": {"lng": p.lng, "lat": p.lat}
+                    if p.lng is not None and p.lat is not None
+                    else None,
+                    "rating": p.rating,
+                    "cost": p.cost,
                 }
             )
 

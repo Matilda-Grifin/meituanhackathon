@@ -239,6 +239,18 @@ def api_harness_state(session_key: str) -> dict:
     return {"ok": True, "state": st}
 
 
+@app.get("/api/session-pois")
+def api_session_pois(session_key: str) -> dict:
+    """App POI 卡：从 harness tools_called 聚合白名单 POI（含坐标/评分/配图）。"""
+    if not session_key.strip():
+        raise HTTPException(400, "session_key required")
+    from lifecare.harness.poi_whitelist import build_whitelist_from_tools
+
+    st = load_state(session_key.strip())
+    wl = build_whitelist_from_tools(st.get("tools_called") or [])
+    return {"ok": True, "pois": [e.to_api_dict() for e in wl]}
+
+
 # ---------------------------------------------------------------------------
 # Eval manual test log — 前端人工评测 10 Tasks 结构化日志
 # ---------------------------------------------------------------------------

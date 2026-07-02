@@ -5,6 +5,10 @@ __pycache__/
 .pytest_cache/
 *.pem
 gateway-chat-ui/node_modules/
+gateway-chat-ui/dist-app/
+gateway-chat-ui/test-results/
+pitch-deck/node_modules/
+.clawhub/
 sandbox/
 overseas-proxy/
 *.tgz

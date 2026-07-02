@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>技术架构 · 现在就出发</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 1920px; height: 1080px;
+      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      background: linear-gradient(135deg, #fafafa 0%, #fff8e1 100%);
+      padding: 48px 56px;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 42px; margin-bottom: 8px; }
+    .sub { font-size: 20px; color: #6b6b6b; margin-bottom: 36px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto auto auto auto;
+      gap: 20px 24px;
+      height: 900px;
+    }
+    .box {
+      border-radius: 16px;
+      padding: 20px 22px;
+      border: 2px solid #e8e8e8;
+      background: #fff;
+      box-shadow: 0 4px 18px rgba(0,0,0,.06);
+      position: relative;
+    }
+    .box h3 { font-size: 22px; margin-bottom: 10px; color: #1a1a1a; }
+    .box p, .box li { font-size: 15px; line-height: 1.55; color: #3d3d3d; }
+    .box ul { padding-left: 18px; margin-top: 6px; }
+    .tag {
+      display: inline-block; font-size: 12px; font-weight: 700;
+      padding: 3px 10px; border-radius: 999px; margin-bottom: 8px;
+    }
+    .user { grid-column: 1 / 4; background: #fff8e1; border-color: #ffc300; }
+    .user .tag { background: #ffc300; color: #1a1a1a; }
+    .gateway { grid-column: 1 / 4; background: #1a1a1a; border-color: #1a1a1a; color: #fff; }
+    .gateway h3, .gateway p, .gateway li { color: #fff; }
+    .gateway .tag { background: #ffc300; color: #1a1a1a; }
+    .soul { border-color: #ff6b00; }
+    .soul .tag { background: #ff6b00; color: #fff; }
+    .skills { border-color: #ffc300; }
+    .skills .tag { background: #ffc300; color: #1a1a1a; }
+    .harness { border-color: #34c759; }
+    .harness .tag { background: #34c759; color: #fff; }
+    .mcp { grid-column: 1 / 3; }
+    .mcp .tag { background: #457b9d; color: #fff; }
+    .llm { grid-column: 3 / 4; background: #fff8e1; border-color: #ffc300; }
+    .llm .tag { background: #ffc300; color: #1a1a1a; }
+    .data { grid-column: 1 / 4; display: flex; gap: 20px; padding: 16px 22px; align-items: center; }
+    .data .tag { background: #ebebeb; color: #1a1a1a; }
+    .pill { background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 10px; padding: 10px 16px; font-size: 14px; flex: 1; text-align: center; }
+    .arrow-row {
+      grid-column: 1 / 4; text-align: center; font-size: 28px; color: #ffc300;
+      line-height: 1; margin: -8px 0;
+    }
+    .flow-label { font-size: 13px; color: #6b6b6b; text-align: center; grid-column: 1/4; margin-top: -12px; }
+  </style>
+</head>
+<body>
+  <h1>技术架构 · 现在就出发</h1>
+  <p class="sub">OpenClaw 持久会话 + 原子 Skill + Harness 护栏 + 真实 MCP 工具链</p>
+
+  <div class="grid">
+    <div class="box user">
+      <span class="tag">C 端</span>
+      <h3>点评管家 App · gateway-chat-ui (:8081)</h3>
+      <p>React 单列对话壳 · WebSocket 实时流式 · POI 横卡 / 进度条 / 地图 · 固定 Seed 2.0 Lite</p>
+    </div>
+
+    <div class="arrow-row">▼ WebSocket · chat.send / toolSteps / chat.final</div>
+
+    <div class="box gateway">
+      <span class="tag">核心</span>
+      <h3>OpenClaw Gateway（会话中枢）</h3>
+      <ul>
+        <li>持久化多轮 Session，连接断开不丢上下文</li>
+        <li>ReAct 循环：Think → Act(MCP) → Observe → 直至任务完成</li>
+        <li>App / Web 共享同一 Gateway，同一 session 逻辑</li>
+      </ul>
+    </div>
+
+    <div class="arrow-row">▼</div>
+    <p class="flow-label">SOUL 阶段路由 · A 补槽 → B 搜点算路 → C 出方案</p>
+
+    <div class="box soul">
+      <span class="tag">人设</span>
+      <h3>SOUL.md</h3>
+      <ul>
+        <li>人格语气 + 阶段门禁（A 禁 search/route）</li>
+        <li>bootstrap 预注入 intake 摘要</li>
+        <li>输出形态：口语总评 → 时间表 → POI</li>
+      </ul>
+    </div>
+
+    <div class="box skills">
+      <span class="tag">Skill</span>
+      <h3>四原子 Skill</h3>
+      <ul>
+        <li><b>travel-intake</b> — 补槽选择题</li>
+        <li><b>local-itinerary-planner</b> — 长文方案</li>
+        <li><b>route-and-mobility</b> — 高德算路</li>
+        <li><b>mock-user-prefs-reviews</b> — 偏好加权</li>
+      </ul>
+    </div>
+
+    <div class="box harness">
+      <span class="tag">护栏</span>
+      <h3>Harness Engineering</h3>
+      <ul>
+        <li><b>Pre-Tool Guard</b> — 阶段/参数校验</li>
+        <li><b>Post-Output Repair</b> — Markdown 修复</li>
+        <li>YAML 能力边界（可规划、不可订票）</li>
+      </ul>
+    </div>
+
+    <div class="arrow-row">▼ tool_calls</div>
+
+    <div class="box mcp">
+      <span class="tag">MCP</span>
+      <h3>Python MCP Server · 真实外部数据</h3>
+      <ul>
+        <li><b>高德</b> — POI 搜索 / 步行·驾车算路 / 经纬度地址</li>
+        <li><b>Open-Meteo</b> — 目的地天气</li>
+        <li><b>Redis</b> — POI TTL 10min · 天气 TTL 1d · 降级无缓存可用</li>
+      </ul>
+    </div>
+
+    <div class="box llm">
+      <span class="tag">LLM</span>
+      <h3>豆包 Seed 2.0 Lite</h3>
+      <ul>
+        <li>11 模型×3 任务横向 #1</li>
+        <li>现网首字 &lt;5s</li>
+        <li>任务总时长 &lt;35s（优化后）</li>
+      </ul>
+    </div>
+
+    <div class="box data">
+      <span class="tag">部署</span>
+      <div class="pill">ECS · Docker Compose</div>
+      <div class="pill">Nginx 8081 · dist-app</div>
+      <div class="pill">评测：11×3 选型 + 50 题 rubric 回归</div>
+      <div class="pill">文档 + GitHub + 可现场 Demo</div>
+    </div>
+  </div>
+</body>
+</html>

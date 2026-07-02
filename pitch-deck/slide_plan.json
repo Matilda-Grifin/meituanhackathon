@@ -1,0 +1,203 @@
+{
+  "title": "现在就出发 · 点评管家",
+  "font_heading": "Microsoft YaHei",
+  "font_body": "Microsoft YaHei",
+  "slides": [
+    {
+      "layout": "title",
+      "title": "现在就出发",
+      "subtitle": "AI 本地路线智能规划管家 · 点评管家 App\n赛题5 · 决赛 · Demo 121.41.81.58:8081\n10min 路演 + 10min 答辩 · 可现场演示（非视频）",
+      "notes": "开场：一句话说明我们是帮用户在 10 分钟内拿到能照着走的本地行程"
+    },
+    {
+      "layout": "content",
+      "title": "我们在解决什么问题？",
+      "subtitle": "竞品快，但复杂约束漏、规划波动大、界面像工具",
+      "body": [
+        "黑盒等待 — 发完消息不知道 Agent 有没有在干活，5 秒以上就焦虑",
+        "约束遗漏 — 闭馆日、预算、无障碍、赶车时间经常被忽略",
+        "质量波动 — 多 POI 串联有时像「编」出来的，同一需求每次差很多",
+        "工具感强 — 话术像报告、UI 像调试台，不像朋友帮你安排",
+        "",
+        "我们的解法：真实 POI 检索 + 算路打底 · Harness 保稳定 · App 朋友化交付"
+      ],
+      "notes": "对比 OTA/独立 App/对话助手四类痛点"
+    },
+    {
+      "layout": "content",
+      "title": "产品是什么？",
+      "subtitle": "C 端单列对话 · 同一后端 · 决赛演示 App :8081",
+      "body": [
+        "点评管家 — 手机上的本地逛吃规划搭子",
+        "流程：一句人话 → 2～3 道选择题补槽 → 查天气/搜 POI/算路 → 流式方案",
+        "POI 横卡内嵌每日行程 · 小地图可展开 · chips 追问局部改方案",
+        "固定大脑：豆包 Seed 2.0 Lite（11 模型横向评测综合分第一）",
+        "",
+        "术语：POI = 真实地点（店/景点）；补槽 = 用选择题补齐预算/偏好等约束"
+      ],
+      "phones": [{ "file": "02-plan.png", "caption": "完整方案 · POI 卡", "x": 5.85, "w": 3.35, "y": 1.0 }]
+    },
+    {
+      "layout": "phones-large",
+      "title": "App 交互流程（一）",
+      "subtitle": "开口补槽 → 过程可见 → 方案流出",
+      "phones": [
+        { "file": "01-intake.png", "caption": "① 开口 + 选择题\n（travel-intake 补槽，Stage A 禁搜点）" },
+        { "file": "03-stream.png", "caption": "② 进度 + 流式\n（ThinkingBubble，规则映射 toolSteps）" },
+        { "file": "02-plan.png", "caption": "③ 完整方案\n（表格 + POI 卡 + 动线）" }
+      ],
+      "footer": "进度条：用户发消息后、正式回复前必有单行朋友化文案（最短 ~0.75s）"
+    },
+    {
+      "layout": "phones-large",
+      "title": "App 交互流程（二）",
+      "subtitle": "POI 地点栏 · 行程一览 · 猜你想问",
+      "phones": [
+        { "file": "02-plan.png", "caption": "POI 横卡：评分/人均/距你\n点击跳转高德 · 正文去重链接" },
+        { "file": "04-image.png", "caption": "行程一览图 + chips\n追问 = 完整新一轮对话" }
+      ],
+      "footer": "异步分层：先文字流式 → 后 itinerary-image 插画 → 地图异步补全"
+    },
+    {
+      "layout": "two-column",
+      "title": "体验设计：UI + Agent 双层朋友化",
+      "subtitle": "工具感 = 报告腔 Agent + 控制台 UI，必须两层同步改",
+      "body": [
+        "UI 层（App 8081）",
+        "· 美团黄 #ffc300 + 浅色方案泡",
+        "· 进度条在聊天气泡内，非底部 timeline",
+        "· POI 横卡可跳高德 · 地图可展开",
+        "· 仅 .stream 内滚动，无整页双滚动条",
+        "—",
+        "Agent 层（SOUL.md）",
+        "· 称呼「你/咱们」，先口语总评再时间表",
+        "· 禁止客服腔；追问短答不重复贴整表",
+        "· B 阶段 ack 不进对话区，仅进度条展示",
+        "· 进度文案前端规则生成，零额外 LLM 成本"
+      ]
+    },
+    {
+      "layout": "image-split",
+      "title": "技术架构",
+      "subtitle": "OpenClaw 持久会话 · 四 Skill · Harness · 真实 MCP",
+      "image": "architecture.png",
+      "body": [
+        "OpenClaw Gateway：WebSocket 中枢，Session 持久化，ReAct 工具循环",
+        "SOUL.md：阶段 A 补槽 → B 搜点算路 → C 出方案；A 阶段 Pre-Tool 禁 search",
+        "Harness：Pre 参数/阶段校验 · Post Markdown/Mermaid 修复",
+        "MCP：高德 POI+算路 · Open-Meteo · Redis 缓存（不可达则降级）",
+        "LLM：Seed 2.0 Lite · 11 模型×3 任务选型第一 · 现网首字 <5s"
+      ],
+      "glossary": [
+        "OpenClaw = 会话基础设施，连接断开会话不丢",
+        "Skill = 可复用能力模块（补槽/规划/算路/偏好）",
+        "Harness = Agent 侧车护栏，约束工具调用与输出质量",
+        "MCP = 模型调用外部工具的标准协议层"
+      ]
+    },
+    {
+      "layout": "table",
+      "title": "模型怎么选的？11 模型 × 3 任务",
+      "subtitle": "人工走查 App + OpenClaw session 自动 rubric · 每模型 3 道代表题",
+      "table": {
+        "headers": ["#", "模型", "达标率", "首字", "总时长", "综合分", "结论"],
+        "rows": [
+          ["1", "Seed 2.0 Lite", "96.3%", "<5s", "<35s", "0.94", "现网默认"],
+          ["2", "DeepSeek V4 Flash", "95.8%", "19.5s", "61s", "0.88", "速度备选"],
+          ["3", "Seed 2.0 Code", "70.4%", "24.7s", "94s", "0.74", "困难不稳"],
+          ["4", "Seed 2.0 Pro", "100%*", "22.8s", "56s", "0.73", "话术好"],
+          ["5", "Kimi K2.6", "87.5%", "38.2s", "40s", "0.71", "首响偏慢"],
+          ["6", "GLM-4.7", "62.5%", "19.0s", "65s", "0.70", "易空答"],
+          ["7", "MiniMax M3", "52.3%", "33.7s", "82s", "0.55", "不推荐"]
+        ]
+      },
+      "glossary": [
+        "达标率（Mean Reward）= 每条 rubric（须调天气/须搜 POI/预算符合等）达标比例，对 3 题取平均",
+        "首字 = 用户发消息后到 Agent 出第一个字的耗时；总时长 = 各轮回复 duration 之和（不含用户停顿）",
+        "综合分 = 55%×达标率 + 22.5%×首字得分 + 22.5%×总时长得分（≤10s/≤90s 满分）− 工具降级惩罚",
+        "Lite 首字/总时长为 bootstrap 优化后现网实测；其余为 2026-06 横向评测原始值"
+      ],
+      "footer": "任务：T063_002 简单 / T063_034 中等 / T063_048 困难 · 详见《11模型Agent横向评测报告》"
+    },
+    {
+      "layout": "content",
+      "title": "评测体系：选型 → 深测 → 迭代",
+      "subtitle": "现网模型来自 11×3 横向，不是只跑 Qwen 一家",
+      "body": [
+        "第一层 · 11 模型×3 任务人工横向（2026-06）→ 选定 Seed Lite 上线",
+        "第二层 · 6.3 自动化批测（50 题考卷 + 滑动窗口 rubric）→ Qwen 等深测 Harness",
+        "第三层 · SOUL/Harness 迭代后回归 → Full Success 82%→90%，工具精准 66%→95%",
+        "",
+        "rubric = 可检查清单（如「是否调用天气」「是否≥3 POI」「预算是否匹配」）",
+        "Orchestrator = 用户模拟 LLM + Agent + 环境工具 + 裁判 LLM 的三方自动循环"
+      ]
+    },
+    {
+      "layout": "constraints",
+      "title": "赛题硬性约束 · 我们怎么满足",
+      "subtitle": "完整性 · 创新性 · 工程化 — 评审三维对齐",
+      "columns": [
+        {
+          "title": "硬性约束",
+          "items": [
+            "首 Token < 10s → 两阶段补槽 + bootstrap，现网 <5s",
+            "POI 餐饮 + 文化 → Skill 强制双类型搜索 + Harness 校验",
+            "单路线 ≥3 POI → 半天 ≥3 锚点 + 1 餐，点间必算路"
+          ]
+        },
+        {
+          "title": "完整性",
+          "items": [
+            "POI 经纬度/地址来自高德，拒绝脑补",
+            "SOUL 预留吃饭、赶路、闭馆冲突处理",
+            "冲突需求 explicit trade-off 说明"
+          ]
+        },
+        {
+          "title": "创新性 & 工程",
+          "items": [
+            "App 朋友化 UI + SOUL 双层体验创新",
+            "真实 MCP 检索 + 算路，非纯生成",
+            "Demo + GitHub + 方案文档可复现"
+          ]
+        }
+      ]
+    },
+    {
+      "layout": "results",
+      "title": "项目成果 & 交付物",
+      "subtitle": "数据可验证 · 决赛三项交付齐全",
+      "stats": [
+        { "value": "82→90%", "label": "任务成功率", "note": "50 题 rubric" },
+        { "value": "66→95%", "label": "工具精准率", "note": "Harness+SOUL" },
+        { "value": "100%", "label": "POI 双类型", "note": "餐饮+文化" },
+        { "value": "<5s", "label": "首 Token", "note": "bootstrap 后" }
+      ],
+      "body": [
+        "在线 Demo：https://121.41.81.58:8081（App 壳 · 自签证书需继续访问）",
+        "代码：gateway-chat-ui · OpenClaw workspace · MCP · Harness · 评测流水线",
+        "文档：产品设计思路.md · App UI方案.md · 11 模型横向报告 · 6.3 批测方案",
+        "部署：ECS + Docker Compose + nginx 8081 · npm run build:app"
+      ]
+    },
+    {
+      "layout": "content",
+      "title": "现场演示脚本（约 3 分钟）",
+      "subtitle": "建议手机或窄屏 Chrome 打开 8081",
+      "body": [
+        "1. 发送：「我和老伴想在附近玩半天，少台阶少走路」",
+        "2. 指给评委：进度条 → 选择题 pill → 提交",
+        "3. 等方案流出：POI 横卡 · 浅色表格/Mermaid · 小地图",
+        "4. 点 chip「路线再轻松点」→ 新进度条 + 局部修订方案",
+        "5. 点 POI 卡 → 跳转高德详情页（真实 POI，非编造）",
+        "",
+        "备用话术：OpenClaw 同 session 可追问；Harness 保证补槽阶段不会提前搜点"
+      ]
+    },
+    {
+      "layout": "section",
+      "title": "谢谢 · 欢迎提问",
+      "subtitle": "现在就出发 · 点评管家"
+    }
+  ]
+}

@@ -133,3 +133,46 @@ def plan_route_driving(
 
     cache_set_json(ck, out, ttl_seconds=900)
     return out
+
+
+def plan_route_walking(
+    origin_lng: float, origin_lat: float, dest_lng: float, dest_lat: float
+) -> dict[str, Any]:
+    """步行路径规划：距离(米)、时间(秒)。"""
+    settings = get_settings()
+    if not settings.amap_key:
+        return {"ok": False, "error": "AMAP_KEY 未配置"}
+
+    origin = f"{origin_lng},{origin_lat}"
+    destination = f"{dest_lng},{dest_lat}"
+    ck = f"lifecare:amap:walk:{origin}:{destination}"
+    cached = cache_get_json(ck)
+    if cached is not None:
+        return cached
+
+    params = {
+        "key": settings.amap_key,
+        "origin": origin,
+        "destination": destination,
+    }
+    with httpx.Client(timeout=20.0) as client:
+        r = client.get(f"{AMAP_BASE}/direction/walking", params=params)
+        r.raise_for_status()
+        data = r.json()
+
+    out: dict[str, Any] = {"ok": False, "mode": "walking"}
+    if data.get("status") == "1" and data.get("route"):
+        paths = data["route"].get("paths") or []
+        if paths:
+            p0 = paths[0]
+            out = {
+                "ok": True,
+                "mode": "walking",
+                "distance_m": int(p0.get("distance", 0)),
+                "duration_s": int(p0.get("duration", 0)),
+            }
+    if not out.get("ok"):
+        out["error"] = data.get("info") or "walking route failed"
+
+    cache_set_json(ck, out, ttl_seconds=900)
+    return out

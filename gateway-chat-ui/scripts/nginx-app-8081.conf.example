@@ -1,0 +1,25 @@
+# Nginx：App 壳独立端口 8081（不影响 8080 桌面版）
+# 将 dist-app 部署到 /var/www/gateway-chat-ui-app/ 后 include 本段。
+
+server {
+    listen 8081;
+    listen [::]:8081;
+    server_name _;
+
+    root /var/www/gateway-chat-ui-app;
+    index app.html;
+
+    # SPA fallback（Vite app 入口为 app.html）
+    location / {
+        try_files $uri $uri/ /app.html;
+    }
+
+    # 与 8080 共用同一 gateway_context_api
+    location /api/ {
+        proxy_pass http://127.0.0.1:8098;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
