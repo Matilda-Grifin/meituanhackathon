@@ -51,6 +51,16 @@ export function isPlanMessage(text: string): boolean {
   return false;
 }
 
+/** 方案正文已开始展示（比 isPlanMessage 宽松，用于收起进度泡） */
+export function isPlanContentVisible(text: string): boolean {
+  const t = text.trim();
+  if (!t || isNoiseAssistantSegment(t)) return false;
+  if (isPlanMessage(t)) return true;
+  if (/##\s*📋|行程速览/.test(t)) return true;
+  if (/^#\s+.+/m.test(t) && t.length >= 48) return true;
+  return false;
+}
+
 /** 跳过选择题后进 B 阶段的首句声明（须独立展示，不参与 ack 隐藏/合并） */
 export function isSkipIntakeEntryAck(text: string): boolean {
   const t = text.trim();

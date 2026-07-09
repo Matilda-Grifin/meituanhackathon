@@ -46,11 +46,14 @@ stages:
       - lifecare_inject_sandbox_failure
 
   followup_qa:
-    allow_tools: []
-    optional_tools:
+    allow_tools:
       - lifecare_get_weather
       - lifecare_search_places
       - lifecare_plan_route
+    optional_tools:
+      - lifecare_sandbox_catalog
+      - lifecare_get_venue_queue
+      - lifecare_get_attraction_crowd
 
   followup_replan:
     allow_tools:

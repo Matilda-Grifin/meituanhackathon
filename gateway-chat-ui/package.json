@@ -12,6 +12,9 @@
     "preview": "vite preview",
     "preview:app": "vite preview --config vite.app.config.ts --outDir dist-app",
     "test:app": "playwright test scripts/e2e-app-send.spec.ts --config scripts/playwright.app.config.ts",
+    "test:plan-poi": "playwright test scripts/e2e-plan-poi-embed.spec.ts --config scripts/playwright.plan-poi.config.ts",
+    "test:progress-copy": "node --experimental-strip-types scripts/check-friendly-progress.ts",
+    "test:intake-footer": "node --experimental-strip-types scripts/check-intake-footer.ts",
     "postinstall": "patch-package"
   },
   "dependencies": {

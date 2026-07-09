@@ -59,6 +59,8 @@ import {
 import { IntakeCard } from "./IntakeCard";
 import {
   extractIntakeOnlyText,
+  extractIntakeFooterLine,
+  isIntakeFooterOnlyBubble,
   mergeIntakeBlocks,
   parseIntakeSurvey,
   parseQuestionBlocks,
@@ -75,6 +77,7 @@ import {
   isAckMessage,
   isIntakeQuestionText,
   isPlanMessage,
+  isPlanContentVisible,
   isSkipIntakeEntryAck,
   liveStreamDisplayText,
   indexOfFirstVisibleUser,
@@ -91,7 +94,11 @@ import {
   labelForTool,
   type ProcessStep,
 } from "./toolProgress";
-import { mapFriendlyProgress } from "./friendlyProgress";
+import {
+  B_PHASE_STAGE_MS,
+  INTAKE_PHASE_T3_MS,
+  mapFriendlyProgress,
+} from "./friendlyProgress";
 import { useSessionPois } from "./hooks/useSessionPois";
 import { ThinkingBubble } from "./components/ThinkingBubble";
 import { HistoryDrawer } from "./components/HistoryDrawer";
@@ -592,7 +599,25 @@ function buildTurnIntakeSnapshot(rows: ChatRow[], anchorIdx: number): IntakeSubm
 }
 
 function isIntakeSubmissionText(text: string): boolean {
-  return /^选择题答案：/.test(text.trim()) || /^全部用默认/.test(text.trim());
+  const t = text.trim();
+  return (
+    /^选择题答案：/.test(t) ||
+    /^选项答案：/.test(t) ||
+    /^全部用默认/.test(t)
+  );
+}
+
+function countVisibleNonIntakeUsers(rows: ChatRow[]): number {
+  let n = 0;
+  for (const r of rows) {
+    if (isVisibleUserRow(r) && !isIntakeSubmissionText(r.text)) n++;
+  }
+  return n;
+}
+
+/** 方案已交付后的 chip / 输入框追问 */
+function isFollowUpContext(rows: ChatRow[], locked: boolean): boolean {
+  return locked || countVisibleNonIntakeUsers(rows) > 1;
 }
 
 /** B 阶段及追问轮：不在对话区 early flush ack（进展条已承载），避免闪一下后消失 */
@@ -1269,6 +1294,12 @@ const mobileShell = import.meta.env.VITE_APP_SHELL === "mobile";
 const autoConnect = import.meta.env.VITE_AUTO_CONNECT === "true";
 const showDebug = import.meta.env.VITE_SHOW_DEBUG === "true";
 
+function resolveDefaultModelId(): string {
+  const fromEnv = envStr("VITE_DEFAULT_MODEL_ID");
+  if (fromEnv) return fromEnv;
+  return mobileShell ? "doubao-seed-2.0-lite" : "doubao-seed-2.0-code";
+}
+
 const TASK_ID_RE = /\b(T063_\d{3}|task_0\d{2})\b/i;
 
 function parseTaskIdFromText(text: string): string | null {
@@ -1329,6 +1360,7 @@ export default function App() {
   const [intakeFollowUp, setIntakeFollowUp] = useState<Record<number, string>>({});
   const [frozenIntake, setFrozenIntake] = useState<IntakeBlock[] | null>(null);
   const [frozenIntakeIntro, setFrozenIntakeIntro] = useState("");
+  const [frozenIntakeFooter, setFrozenIntakeFooter] = useState("");
   const [intakeSubmitted, setIntakeSubmitted] = useState(false);
   const [intakeViaFreetext, setIntakeViaFreetext] = useState(false);
   const [submittedIntake, setSubmittedIntake] = useState<IntakeSubmittedSnapshot | null>(null);
@@ -1376,6 +1408,14 @@ export default function App() {
   const imageGenPendingRef = useRef(false);
   const [ackFlushedTick, setAckFlushedTick] = useState(0);
   const optimisticUserRef = useRef<string | null>(null);
+  /** A 阶段等选择题：Send 时刻，供进度文案按 4/8/12s 轮换 */
+  const intakeWaitStartedAtRef = useRef<number | null>(null);
+  const intakeWaitTimersRef = useRef<number[]>([]);
+  /** B 阶段交卷后：Send 时刻，供进度文案按 6s×4 轮换 */
+  const bPhaseWaitStartedAtRef = useRef<number | null>(null);
+  const bPhaseWaitTimersRef = useRef<number[]>([]);
+  const bPhaseProgressActiveRef = useRef(false);
+  const followUpProgressActiveRef = useRef(false);
   const historyPollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshHistoryRef = useRef<(opts?: { keepOnEmpty?: boolean; sessionKeyOverride?: string }) => Promise<void>>(
     async () => {},
@@ -1432,7 +1472,7 @@ export default function App() {
 
   // ── Model selector state ──
   const [availableModels, setAvailableModels] = useState<Array<{ id: string; label: string }>>([]);
-  const [currentModelId, setCurrentModelId] = useState("doubao-seed-2.0-code");
+  const [currentModelId, setCurrentModelId] = useState(resolveDefaultModelId);
   const currentModelIdRef = useRef(currentModelId);
   const [modelSwitching, setModelSwitching] = useState(false);
   const [modelSwitchMsg, setModelSwitchMsg] = useState("");
@@ -1451,9 +1491,26 @@ export default function App() {
     try {
       const resp = await fetch("/api/models");
       const data = await resp.json();
-      if (data.ok) {
-        setAvailableModels(data.models || []);
-        if (data.current) setCurrentModelId(data.current);
+      if (!data.ok) return;
+      setAvailableModels(data.models || []);
+      const appTarget = mobileShell ? resolveDefaultModelId() : null;
+      const serverCurrent = typeof data.current === "string" ? data.current : "";
+      if (appTarget && serverCurrent && serverCurrent !== appTarget) {
+        const sw = await fetch("/api/switch-model", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model_id: appTarget }),
+        });
+        const swData = await sw.json();
+        if (swData.ok) {
+          setCurrentModelId(appTarget);
+          currentModelIdRef.current = appTarget;
+          return;
+        }
+      }
+      if (serverCurrent) {
+        setCurrentModelId(serverCurrent);
+        currentModelIdRef.current = serverCurrent;
       }
     } catch { /* ignore on first load */ }
   }, []);
@@ -1624,18 +1681,23 @@ export default function App() {
     if (currentTurnAnchorIdx < 0) {
       setFrozenIntake(null);
       setFrozenIntakeIntro("");
+      setFrozenIntakeFooter("");
       return;
     }
     if (intakeBlocks.length > 0) {
       setFrozenIntake(intakeBlocks);
       if (intakeIntro) setFrozenIntakeIntro(intakeIntro);
+      const footer = extractIntakeFooterLine(intakeParseText);
+      if (footer) setFrozenIntakeFooter(footer);
     } else if (!streaming.trim()) {
       setFrozenIntake(null);
       setFrozenIntakeIntro("");
+      setFrozenIntakeFooter("");
     }
   }, [
     intakeBlocks,
     intakeIntro,
+    intakeParseText,
     currentTurnAnchorIdx,
     streaming,
     lastUserIsIntakeSubmission,
@@ -1645,6 +1707,25 @@ export default function App() {
   ]);
 
   const displayIntakeIntro = frozenIntakeIntro || intakeIntro;
+
+  const intakeFooterHint = useMemo(() => {
+    if (intakeParseText.trim()) {
+      const fromParse = extractIntakeFooterLine(intakeParseText);
+      if (fromParse) return fromParse;
+    }
+    const anchorIdx = currentTurnAnchorIdx;
+    if (anchorIdx >= 0) {
+      for (let i = rows.length - 1; i > anchorIdx; i--) {
+        const r = rows[i]!;
+        if (String(r.role).toLowerCase() !== "assistant") continue;
+        const raw = stripLeadingAssistantPlaceholders(r.text);
+        const footer = extractIntakeFooterLine(raw);
+        if (footer) return footer;
+        if (hasIntakeQuestions(extractIntakeOnlyText(raw))) break;
+      }
+    }
+    return frozenIntakeFooter;
+  }, [intakeParseText, rows, currentTurnAnchorIdx, frozenIntakeFooter]);
 
   const persistedIntakeSnapshot =
     intakeUnlockedForNewTrip ? null : (sessionPlanningIntake?.snapshot ?? null);
@@ -1701,6 +1782,111 @@ export default function App() {
   useEffect(() => {
     sessionKeyRef.current = sessionKey.trim();
   }, [sessionKey]);
+
+  const clearIntakeWaitTimers = useCallback(() => {
+    for (const id of intakeWaitTimersRef.current) window.clearTimeout(id);
+    intakeWaitTimersRef.current = [];
+    intakeWaitStartedAtRef.current = null;
+  }, []);
+
+  const clearBPhaseWaitTimers = useCallback(() => {
+    for (const id of bPhaseWaitTimersRef.current) window.clearTimeout(id);
+    bPhaseWaitTimersRef.current = [];
+    bPhaseWaitStartedAtRef.current = null;
+    bPhaseProgressActiveRef.current = false;
+    followUpProgressActiveRef.current = false;
+  }, []);
+
+  const startIntakeWaitTimers = useCallback(
+    (sendTime: number) => {
+      clearIntakeWaitTimers();
+      intakeWaitStartedAtRef.current = sendTime;
+      for (const ms of [4_000, 8_000, INTAKE_PHASE_T3_MS]) {
+        intakeWaitTimersRef.current.push(
+          window.setTimeout(() => setThinkingUiTick((n) => n + 1), ms),
+        );
+      }
+    },
+    [clearIntakeWaitTimers],
+  );
+
+  const startBPhaseWaitTimers = useCallback(
+    (sendTime: number) => {
+      clearBPhaseWaitTimers();
+      bPhaseProgressActiveRef.current = true;
+      followUpProgressActiveRef.current = false;
+      bPhaseWaitStartedAtRef.current = sendTime;
+      for (const ms of [B_PHASE_STAGE_MS, B_PHASE_STAGE_MS * 2, B_PHASE_STAGE_MS * 3]) {
+        bPhaseWaitTimersRef.current.push(
+          window.setTimeout(() => setThinkingUiTick((n) => n + 1), ms),
+        );
+      }
+    },
+    [clearBPhaseWaitTimers],
+  );
+
+  const startFollowUpProgressTimers = useCallback(
+    (sendTime: number) => {
+      clearBPhaseWaitTimers();
+      followUpProgressActiveRef.current = true;
+      bPhaseProgressActiveRef.current = false;
+      bPhaseWaitStartedAtRef.current = sendTime;
+      for (const ms of [B_PHASE_STAGE_MS, B_PHASE_STAGE_MS * 2, B_PHASE_STAGE_MS * 3]) {
+        bPhaseWaitTimersRef.current.push(
+          window.setTimeout(() => setThinkingUiTick((n) => n + 1), ms),
+        );
+      }
+    },
+    [clearBPhaseWaitTimers],
+  );
+
+  const beginTurnProgressUi = useCallback(
+    (sendTime: number, rowsSnapshot: ChatRow[]) => {
+      setStreaming("");
+      setAwaitingAgent(true);
+      setAgentReplyPending(true);
+      setMinThinkingUntil(Date.now() + 750);
+      setThinkingUiTick((n) => n + 1);
+      clearIntakeWaitTimers();
+      if (isFollowUpContext(rowsSnapshot, intakeLocked)) {
+        startFollowUpProgressTimers(sendTime);
+      } else {
+        clearBPhaseWaitTimers();
+        startIntakeWaitTimers(sendTime);
+      }
+      setToolSteps(() => appendProcessStep([], "正在发送，Agent 正在回复…"));
+    },
+    [
+      clearBPhaseWaitTimers,
+      clearIntakeWaitTimers,
+      intakeLocked,
+      startFollowUpProgressTimers,
+      startIntakeWaitTimers,
+    ],
+  );
+
+  const resetTurnProgressUi = useCallback(() => {
+    setAgentReplyPending(false);
+    setAwaitingAgent(false);
+    clearIntakeWaitTimers();
+    clearBPhaseWaitTimers();
+    setToolSteps([]);
+  }, [clearBPhaseWaitTimers, clearIntakeWaitTimers]);
+
+  useEffect(() => {
+    if (!agentReplyPending) {
+      clearIntakeWaitTimers();
+      clearBPhaseWaitTimers();
+    }
+  }, [agentReplyPending, clearIntakeWaitTimers, clearBPhaseWaitTimers]);
+
+  useEffect(
+    () => () => {
+      clearIntakeWaitTimers();
+      clearBPhaseWaitTimers();
+    },
+    [clearIntakeWaitTimers, clearBPhaseWaitTimers],
+  );
 
   const evalThreadMeta = useCallback(() => {
     const t = threads.find((x) => x.id === activeThreadId);
@@ -1987,6 +2173,19 @@ export default function App() {
 
   const lastUserText = useMemo(() => lastUserTextInRows(rows), [rows]);
 
+  const firstVisibleUserText = useMemo(() => {
+    for (const r of rows) {
+      if (!isVisibleUserRow(r) || isIntakeSubmissionText(r.text)) continue;
+      const t = extractUserVisibleTextFromMessage(r.text).trim() || r.text.trim();
+      if (t) return t;
+    }
+    if (pendingUserDisplay?.text) {
+      const t = extractUserVisibleTextFromMessage(pendingUserDisplay.text).trim();
+      if (t && !isIntakeSubmissionText(t)) return t;
+    }
+    return "";
+  }, [rows, pendingUserDisplay]);
+
   const isFollowUpTurn = useMemo(() => {
     let userCount = 0;
     for (const r of rows) {
@@ -2025,6 +2224,26 @@ export default function App() {
     ],
   );
 
+  const intakeWaitElapsedMs = useMemo(() => {
+    void thinkingUiTick;
+    const start = intakeWaitStartedAtRef.current;
+    if (!start || !agentReplyPending) return 0;
+    return Math.max(0, Date.now() - start);
+  }, [
+    thinkingUiTick,
+    agentReplyPending,
+    showIntakeLoading,
+    intakePhasePending,
+  ]);
+
+  const bPhaseWaitElapsedMs = useMemo(() => {
+    void thinkingUiTick;
+    const start = bPhaseWaitStartedAtRef.current;
+    if (!start || !agentReplyPending) return 0;
+    if (!bPhaseProgressActiveRef.current && !followUpProgressActiveRef.current) return 0;
+    return Math.max(0, Date.now() - start);
+  }, [thinkingUiTick, agentReplyPending]);
+
   const friendlyThinking = useMemo(
     () =>
       mobileShell
@@ -2042,6 +2261,11 @@ export default function App() {
             hasVisibleUserMessage,
             streaming: streaming.trim().length > 0,
             lastUserText: lastUserText ?? "",
+            firstVisibleUserText: firstVisibleUserText ?? "",
+            intakeWaitElapsedMs,
+            bPhaseWaitElapsedMs,
+            bPhaseProgressActive: bPhaseProgressActiveRef.current,
+            followUpProgressActive: followUpProgressActiveRef.current,
             resolvedLocation,
           })
         : null,
@@ -2059,7 +2283,11 @@ export default function App() {
       hasVisibleUserMessage,
       streaming,
       lastUserText,
+      firstVisibleUserText,
+      intakeWaitElapsedMs,
+      bPhaseWaitElapsedMs,
       resolvedLocation,
+      thinkingUiTick,
     ],
   );
 
@@ -2096,19 +2324,39 @@ export default function App() {
   );
 
   const formalContentStarted = useMemo(() => {
-    if (Date.now() < minThinkingUntil) return false;
     if (showIntakeCard && displayIntakeBlocksResolved.length > 0 && !intakeLocked) return true;
+
+    let lastUserIdx = -1;
+    for (let i = 0; i < displayRows.length; i++) {
+      if (isVisibleUserRow(displayRows[i]!)) lastUserIdx = i;
+    }
+    for (let i = lastUserIdx + 1; i < displayRows.length; i++) {
+      const r = displayRows[i]!;
+      if (String(r.role).toLowerCase() === "assistant" && isPlanContentVisible(r.text)) {
+        return true;
+      }
+    }
+
+    const turnInProgress =
+      agentReplyPending || awaitingAgent || streaming.trim().length > 0;
+    if (!turnInProgress) return false;
+
     const st = streaming.trim();
     if (st && isIntakeQuestionBubble(st)) return true;
-    if (!showLiveBubble) return false;
+
     const live = liveStreamText.trim();
-    if (!live || isNoiseAssistantBubble(live) || isRawToolPayloadText(live)) return false;
-    if (live.length < 48) return false;
-    if (isPlanMessage(live)) return true;
-    if (live.length >= 96) return true;
+    if (
+      live &&
+      !isNoiseAssistantBubble(live) &&
+      !isRawToolPayloadText(live) &&
+      isPlanContentVisible(live)
+    ) {
+      return true;
+    }
+
+    if (showLiveBubble && live.length >= 96) return true;
     return false;
   }, [
-    minThinkingUntil,
     thinkingUiTick,
     showIntakeCard,
     displayIntakeBlocksResolved.length,
@@ -2116,6 +2364,9 @@ export default function App() {
     streaming,
     showLiveBubble,
     liveStreamText,
+    displayRows,
+    agentReplyPending,
+    awaitingAgent,
   ]);
 
   const thinkingDisplay = friendlyThinking ?? { main: "✍️ 攻略制定中…" };
@@ -2128,8 +2379,7 @@ export default function App() {
       (agentReplyPending ||
         showIntakeLoading ||
         imageGenPending ||
-        awaitingAgent ||
-        visibleToolSteps.length > 0),
+        awaitingAgent),
     [
       mobileShell,
       intakeActive,
@@ -2138,7 +2388,6 @@ export default function App() {
       showIntakeLoading,
       imageGenPending,
       awaitingAgent,
-      visibleToolSteps.length,
     ],
   );
 
@@ -2903,6 +3152,8 @@ export default function App() {
             }
             toolStartedThisRunRef.current = false;
             setAckFlushedTick((t) => t + 1);
+            clearBPhaseWaitTimers();
+            setToolSteps([]);
             setAwaitingAgent(false);
             setAgentReplyPending(false);
             stopHistoryPollRef.current();
@@ -3275,14 +3526,41 @@ export default function App() {
       setAgentReplyPending(true);
       setMinThinkingUntil(Date.now() + 750);
       setThinkingUiTick((n) => n + 1);
-      setToolSteps(() =>
-        appendProcessStep(
-          [],
-          isIntakeSubmissionText(msg)
-            ? "正在提交选项…"
-            : "正在发送，Agent 将生成选择题或方案…",
-        ),
-      );
+      if (opts?.userAlreadyShown) {
+        if (followUpProgressActiveRef.current || bPhaseProgressActiveRef.current) {
+          bPhaseWaitStartedAtRef.current = sendTime;
+        } else if (intakeWaitStartedAtRef.current != null) {
+          intakeWaitStartedAtRef.current = sendTime;
+        } else if (isIntakeSubmissionText(msg)) {
+          clearIntakeWaitTimers();
+          startBPhaseWaitTimers(sendTime);
+        } else if (isFollowUpContext(rowsRef.current, intakeLocked)) {
+          clearIntakeWaitTimers();
+          startFollowUpProgressTimers(sendTime);
+        } else {
+          clearBPhaseWaitTimers();
+          startIntakeWaitTimers(sendTime);
+        }
+      } else if (isIntakeSubmissionText(msg)) {
+        clearIntakeWaitTimers();
+        startBPhaseWaitTimers(sendTime);
+      } else if (isFollowUpContext(rowsRef.current, intakeLocked)) {
+        clearIntakeWaitTimers();
+        startFollowUpProgressTimers(sendTime);
+      } else {
+        clearBPhaseWaitTimers();
+        startIntakeWaitTimers(sendTime);
+      }
+      if (!opts?.userAlreadyShown) {
+        setToolSteps(() =>
+          appendProcessStep(
+            [],
+            isIntakeSubmissionText(msg)
+              ? "正在提交选项…"
+              : "正在发送，Agent 将生成选择题或方案…",
+          ),
+        );
+      }
       setStatus("sending…");
 
       const streamBuf = streamingRef.current.trim();
@@ -3300,7 +3578,7 @@ export default function App() {
         appendProcessStep(
           p,
           isIntakeSubmissionText(msg)
-            ? "已提交选项，Agent 正在规划路线并调用工具…"
+            ? "已提交选项，Agent 正在调用工具生成方案…"
             : "消息已发送，Agent 正在回复（补槽 / 调工具 / 生成方案）…",
         ),
       );
@@ -3348,6 +3626,8 @@ export default function App() {
       } catch (e) {
         setAwaitingAgent(false);
         setAgentReplyPending(false);
+        clearIntakeWaitTimers();
+        clearBPhaseWaitTimers();
         const err = `发送失败：${formatRpcError(e)}`;
         setStatus(err);
         if (mobileShell) setMobileNotice(err);
@@ -3356,11 +3636,18 @@ export default function App() {
     [
       activeThreadId,
       appEnabled,
+      clearBPhaseWaitTimers,
+      clearIntakeWaitTimers,
+      intakeLocked,
       logEvalEvent,
+      mobileShell,
       pushLog,
       resolvedLocation,
       sessionKey,
+      startBPhaseWaitTimers,
+      startFollowUpProgressTimers,
       startHistoryPoll,
+      startIntakeWaitTimers,
     ],
   );
 
@@ -3618,22 +3905,24 @@ export default function App() {
       const idem = newIdempotencyKey();
       const userId = `u-${idem}`;
       const userVisible = text;
+      const sendTime = Date.now();
 
+      const nextRows: ChatRow[] = [
+        ...rowsRef.current,
+        { role: "user", text: userVisible, id: userId, timestamp: sendTime },
+      ];
       setPendingUserDisplay({ id: userId, text: userVisible });
-      setRows((r) => {
-        const next: ChatRow[] = [
-          ...r,
-          { role: "user", text: userVisible, id: userId, timestamp: Date.now() },
-        ];
-        rowsRef.current = next;
-        return next;
-      });
+      setRows(nextRows);
+      rowsRef.current = nextRows;
+
+      beginTurnProgressUi(sendTime, nextRows);
 
       if (!connectedRef.current || !clientRef.current?.connected) {
         bumpNotice("正在连接服务器…");
         const linked = await ensureGatewayConnected();
         if (!linked) {
           bumpNotice("连接失败，请刷新页面后重试");
+          resetTurnProgressUi();
           return;
         }
       }
@@ -3646,6 +3935,7 @@ export default function App() {
         sk = sessionKeyRef.current.trim();
         if (!sk) {
           bumpNotice("会话未就绪，请稍后再试");
+          resetTurnProgressUi();
           return;
         }
       }
@@ -3670,6 +3960,7 @@ export default function App() {
     },
     [
       appEnabled,
+      beginTurnProgressUi,
       createNewThread,
       ensureGatewayConnected,
       frozenIntake,
@@ -3680,6 +3971,7 @@ export default function App() {
       intakeSelections,
       lockIntakeSnapshot,
       mobileShell,
+      resetTurnProgressUi,
       sendMessage,
     ],
   );
@@ -3794,7 +4086,8 @@ export default function App() {
               ? "问卷已锁定；您的回复见下方对话气泡"
               : undefined
           }
-          showDefault={/全部用默认/.test(intakeParseText)}
+          showDefault={/全部用默认/.test(intakeParseText) || /全部用默认/.test(intakeFooterHint)}
+          footerHint={intakeFooterHint || undefined}
           canSubmit={canSubmitIntake}
           uiLocked={uiLocked}
           onSelect={(n, letter) => {
@@ -4086,6 +4379,7 @@ export default function App() {
               if (isHiddenChatRow(rl, r.text)) continue;
               if (rl === "assistant" && isNoiseAssistantBubble(r.text)) continue;
               if (rl === "assistant" && isIntakeQuestionBubble(r.text)) continue;
+              if (rl === "assistant" && showIntakeCard && isIntakeFooterOnlyBubble(r.text)) continue;
               if (
                 rl === "assistant" &&
                 intakePhasePending &&
@@ -4212,16 +4506,26 @@ export default function App() {
                 ),
               };
               let insertAt = items.length;
-              if (cardInserted && intakeLocked) {
-                const cardIdx = items.findIndex((it) => it.kind === "intake-card");
-                if (cardIdx >= 0) insertAt = cardIdx + 1;
-              } else if (lastUserBubbleKey) {
+              const anchorThinkingAfterUser = (key: string | null) => {
+                if (!key) return false;
                 const userIdx = items.findIndex(
                   (it) =>
                     (it.kind === "bubble" || it.kind === "pending-user") &&
-                    it.key === lastUserBubbleKey,
+                    it.key === key,
                 );
                 if (userIdx >= 0) insertAt = userIdx + 1;
+                return userIdx >= 0;
+              };
+              // 追问 / chip：进度泡必须紧跟最新 user，不能落在问卷卡下方
+              if (
+                followUpProgressActiveRef.current ||
+                (agentReplyPending && isFollowUpTurn && lastUserBubbleKey)
+              ) {
+                anchorThinkingAfterUser(lastUserBubbleKey);
+              } else if (cardInserted && intakeLocked && bPhaseProgressActiveRef.current) {
+                insertAt = items.length;
+              } else {
+                anchorThinkingAfterUser(lastUserBubbleKey);
               }
               items.splice(insertAt, 0, thinkingItem);
             }
@@ -4308,27 +4612,45 @@ export default function App() {
             </p>
           ) : null}
           <div className={`composer-input-row${mobileShell ? " composer-mobile" : ""}`}>
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              rows={mobileShell ? 1 : 3}
-              placeholder={
-                mobileShell
-                  ? showIntakeCard && !intakeLocked
-                    ? "用口语回答即可，如：我们3个人，地铁出行…"
-                    : "有什么想调整的？"
-                  : showIntakeCard && !intakeLocked
+            {mobileShell ? (
+              <div className="composer-textarea-wrap">
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  rows={1}
+                  placeholder={
+                    showIntakeCard && !intakeLocked
+                      ? "用口语回答即可，如：我们3个人，地铁出行…"
+                      : "有什么想调整的？"
+                  }
+                  disabled={uiLocked}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void send();
+                    }
+                  }}
+                />
+              </div>
+            ) : (
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={3}
+                placeholder={
+                  showIntakeCard && !intakeLocked
                     ? "用口语回答即可，如：我们3个人，地铁出行，不忌口…"
                     : "Enter 发送，Shift+Enter 换行"
-              }
-              disabled={uiLocked}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void send();
                 }
-              }}
-            />
+                disabled={uiLocked}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void send();
+                  }
+                }}
+              />
+            )}
             <button
               type="button"
               className={`send${mobileShell && draftReady ? " send-ready" : ""}${canSendDraft ? " send-active" : ""}`}

@@ -11,7 +11,7 @@
 
 ## 工具来源
 
-- 高德 POI / 驾车路线、Open-Meteo 天气：由 MCP `lifecare__lifecare_*`（OpenClaw 对 `mcp.servers.lifecare` 的命名空间前缀 + `run_mcp.py` 内工具名）提供（见项目 `run_mcp.py`）。
+- 高德 POI / 驾车路线、高德天气（Open-Meteo 兜底）：由 MCP `lifecare__lifecare_*`（OpenClaw 对 `mcp.servers.lifecare` 的命名空间前缀 + `run_mcp.py` 内工具名）提供（见项目 `run_mcp.py`）。
 - 排队/客流/Mock 下单/沙盒 catalog：可选；由 沙盒 FastAPI 提供，仅演示时启动 `uvicorn sandbox.main:app --port 9000`。
 
 ## MCP 工具耗时日志

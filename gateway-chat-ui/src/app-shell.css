@@ -672,17 +672,38 @@ body:has(.app-mobile-viewport) {
   background: var(--surface);
 }
 
-.app.app-mobile .composer-mobile textarea {
+.app.app-mobile .composer-textarea-wrap {
   flex: 1;
+  min-width: 0;
+  max-height: 5rem;
+  overflow: hidden;
+}
+
+.app.app-mobile .composer-mobile textarea {
+  display: block;
+  width: calc(100% + 20px);
+  margin-right: -20px;
+  padding-right: 20px;
   font-size: 16px;
   border: none;
   background: transparent;
   min-height: 40px;
   max-height: 5rem;
   height: auto;
-  padding: 0.5rem 0;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  padding-left: 0;
   resize: none;
   line-height: 1.4;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app.app-mobile .composer-mobile textarea::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .app.app-mobile .composer-mobile textarea,

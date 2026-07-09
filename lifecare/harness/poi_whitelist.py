@@ -89,7 +89,7 @@ def extract_pois_from_tool_result(result: str) -> list[PoiEntry]:
     for p in pois:
         if not isinstance(p, dict):
             continue
-        pid = str(p.get("id") or "").strip()
+        pid = str(p.get("id") or "").strip().replace(" ", "")
         name = str(p.get("name") or "").strip()
         if not pid or not name:
             continue

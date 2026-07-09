@@ -178,6 +178,57 @@ export function buildResolvedLocation(
 /** 根据用户首句粗分场景（注入 Agent 时用，非最终判定） */
 export type TravelSceneHint = "nearby" | "city" | "unknown";
 
+const DISTRICT_CONFIDENCE_MAX_ACCURACY_M = 500;
+
+/** 浏览器定位 + regeo 区县级且精度 ≤500m 时视为高置信出发区 */
+export function isHighConfidenceDistrict(loc: ResolvedLocation): boolean {
+  if (!loc.district?.trim()) return false;
+  if (loc.source === "ip") return false;
+  if (loc.accuracyM == null) return false;
+  return loc.accuracyM <= DISTRICT_CONFIDENCE_MAX_ACCURACY_M;
+}
+
+/** 用户原话是否已指明出发区或地标 */
+export function userMentionedDepartureArea(userText: string): boolean {
+  const t = userText.trim();
+  if (!t) return false;
+  if (/[\u4e00-\u9fa5]{2,10}区/.test(t)) return true;
+  if (/从[\u4e00-\u9fa5]{2,}/.test(t)) return true;
+  if (/在[\u4e00-\u9fa5]{2,10}(?:区|一带|附近)/.test(t)) return true;
+  return false;
+}
+
+function buildNearbyDistrictHint(loc: ResolvedLocation, userText?: string): string {
+  const cityFilled = Boolean(loc.city?.trim());
+  const districtFilled = Boolean(loc.district?.trim());
+  const userHasArea = userText ? userMentionedDepartureArea(userText) : false;
+  const highConf = isHighConfidenceDistrict(loc);
+
+  if (userHasArea) {
+    return `场景 B：city=${loc.city || "未知"}。原话已含出发区/地标，直接采用，勿再问出发区。return_to 默认同出发区。`;
+  }
+  if (districtFilled && highConf) {
+    const accNote =
+      loc.accuracyM != null ? `（浏览器定位约 ${Math.round(loc.accuracyM)} 米）` : "";
+    return (
+      `场景 B：city=${loc.city} 已由定位填写，勿再问城市。区=${loc.district} 已由定位填写${accNote}，` +
+      `直接采用为出发区，勿再问「哪个区」。return_to 默认=${loc.district}。` +
+      `复述须写「从${loc.district}出发」；默认行写「从${loc.district}出发」，用户要改请口语说明。`
+    );
+  }
+  if (districtFilled) {
+    return (
+      `场景 B：city=${loc.city} 已由定位填写，勿再问城市。区=${loc.district}（定位置信度低），` +
+      `须用一题问出发区（A 选项可为「${loc.district}（当前定位）」；B/C 为同城其他区；D. 其他填区或地标），` +
+      `禁止「出行范围/公里圈」题。return_to 默认=${loc.district}。`
+    );
+  }
+  if (cityFilled) {
+    return `场景 B：city=${loc.city} 已填，勿再问城市。定位无区，须用一题问具体区（A/B/C 为该市辖区名，D. 其他填区）。return_to 默认同出发区。`;
+  }
+  return `场景 B：定位无 city，才可用一题问城市；有 city 后再问区。`;
+}
+
 /** 从用户首句生成 intake 去重提示（注入 Agent，减少重复提问） */
 export function buildUserSlotHints(userText: string): string {
   const t = userText.trim();
@@ -213,6 +264,9 @@ export function buildUserSlotHints(userText: string): string {
   if (/几点前回|回家|赶回|六点前|下班前/i.test(t)) {
     lines.push("口头回程时刻=软约束 T_end（勿单独问回程题；return_to 默认定位区）");
   }
+  if (userMentionedDepartureArea(t)) {
+    lines.push("原话可能已含出发区或地标（勿再问哪个区出发）");
+  }
   if (lines.length === 0) return "";
   return `【原话槽位】${lines.join("；")}。`;
 }
@@ -233,12 +287,28 @@ export function formatLocalNowForAgent(): string {
   return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
 }
 
+/** 是否点名异地城市（场景 A），排除「去城里/去附近」 */
+function mentionsRemoteCityDestination(text: string): boolean {
+  return /(?:去|到|飞往|飞到|想去|要去|计划去)(?!附近|周边|城里|市内|本地)[\u4e00-\u9fa5]{2,}(?:市|城|玩|旅游|旅行)/.test(
+    text,
+  );
+}
+
+/** 「城里/市内玩」= 当前城市本地一日，非跨城出行（场景 B） */
+function mentionsLocalCityPlay(text: string): boolean {
+  if (!/城里|市内|本地|市区/.test(text)) return false;
+  if (mentionsRemoteCityDestination(text)) return false;
+  return /玩|逛|待|走走|溜达|出片|拍照|悠闲|逛逛/.test(text);
+}
+
 export function inferTravelSceneFromUserText(text: string): TravelSceneHint {
   const t = text.trim();
   if (!t) return "unknown";
   if (/周边|附近|郊野|不出城|半日|溜娃|家门口|周边玩|出去逛逛|附近玩|同城/i.test(t)) return "nearby";
+  if (mentionsRemoteCityDestination(t)) return "city";
+  if (mentionsLocalCityPlay(t)) return "nearby";
   if (
-    /(?:去|到|在|想去|要去|计划去|飞往|飞到)[\u4e00-\u9fa5]{2,}(?:市|城|玩|旅游|旅行|出差)/.test(t) ||
+    /(?:去|到|想去|要去|计划去|飞往|飞到)[\u4e00-\u9fa5]{2,}(?:市|城|旅游|旅行|出差)/.test(t) ||
     /\d+\s*天.*(?:游|玩|行程)/.test(t) ||
     /异地|出城游|城市游|几日游/.test(t)
   ) {
@@ -263,14 +333,10 @@ export function formatLocationContextMessage(loc: ResolvedLocation, userText?: s
   const slotHints = userText ? buildUserSlotHints(userText) : "";
 
   if (scene === "nearby") {
-    const cityFilled = Boolean(loc.city?.trim());
-    const districtHint = loc.district
-      ? `场景 B：city=${loc.city} 已由定位填写，勿再问城市。区=${loc.district}，用一题确认是否从该区出发（A/B/C 为同城其他区名，D. 其他填区或地标），禁止「出行范围/公里圈」题。return_to 默认=${loc.district}。`
-      : cityFilled
-        ? `场景 B：city=${loc.city} 已填，勿再问城市。须用一题问具体区（A/B/C 为该市辖区名，D. 其他填区）。return_to 默认同出发区。`
-        : `场景 B：定位无 city，才可用一题问城市；有 city 后再问区。`;
+    const districtHint = buildNearbyDistrictHint(loc, userText);
     sceneBlock =
-      `判定倾向：周边游玩。${districtHint} 须按 travel-intake 问 place_type（A–F）、depart_window、play_duration（已填不问）；禁止回程题。` +
+      `判定倾向：周边游玩。${districtHint} 须按 travel-intake 问 place_type（A–F）、depart_window、play_duration（已填不问）；禁止回程题；` +
+      `禁止自造「在哪个区域游玩/去哪个片区」题（圆心=定位区，用户要跨区玩请口语说明）。` +
       `${slotHints ? ` ${slotHints}` : ""}`;
   } else if (scene === "city") {
     sceneBlock =

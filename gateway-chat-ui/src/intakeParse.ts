@@ -32,6 +32,11 @@ const INTAKE_CUT_PATTERNS: RegExp[] = [
   /预算参考/,
 ];
 
+/** 问卷尾部说明行（含「或直接回复：全部用默认…」） */
+export function isIntakeFooterLine(t: string): boolean {
+  return /全部用默认|直接回复|请点击|确认提交|提交所选/i.test(t);
+}
+
 function findIntakeSoftEnd(src: string): number {
   const lines = src.split("\n");
   let sawQuestion = false;
@@ -49,9 +54,11 @@ function findIntakeSoftEnd(src: string): number {
     if (!sawQuestion || lastOptionLine < 0 || i <= lastOptionLine) continue;
     if (!t) continue;
     const intakeLine =
-      /^(\d+(?:[\.、．]|\uFE0F?\u20E3)|第\s*\d+\s*题|[A-FＡ-Ｆ][\.、．、：)]|[-*•]\s|\*\*[A-F]|全部用默认|直接回复|确认提交)/.test(
-        t,
-      );
+      /^(\d+(?:[\.、．]|\uFE0F?\u20E3)|第\s*\d+\s*题)/.test(t) ||
+      /^[A-FＡ-Ｆ][\.、．、：)]/.test(t) ||
+      /^[-*•]\s/.test(t) ||
+      /^\*\*[A-F]/i.test(t) ||
+      isIntakeFooterLine(t);
     if (!intakeLine) {
       let charIdx = 0;
       for (let j = 0; j < i; j++) charIdx += lines[j]!.length + 1;
@@ -59,6 +66,37 @@ function findIntakeSoftEnd(src: string): number {
     }
   }
   return src.length;
+}
+
+/** 从 assistant 问卷段抽出 footer（如「或直接回复：全部用默认…」） */
+export function extractIntakeFooterLine(text: string): string {
+  if (!text.trim()) return "";
+  const footers: string[] = [];
+  for (const raw of text.replace(/\r\n/g, "\n").split("\n")) {
+    const t = cleanIntakeDisplayText(
+      raw
+        .trim()
+        .replace(/^\*\*+|\*\*+$/g, "")
+        .replace(/^#+\s*/, "")
+        .trim(),
+    );
+    if (t && isIntakeFooterLine(t)) footers.push(t);
+  }
+  return footers.join("\n");
+}
+
+/** 仅 footer、无选择题 —— 展示 IntakeCard 时应隐藏 orphan 泡 */
+export function isIntakeFooterOnlyBubble(text: string): boolean {
+  const t = text.trim().replace(/\r\n/g, "\n");
+  if (!t || hasIntakeQuestions(t)) return false;
+  const intakeOnly = extractIntakeOnlyText(t);
+  if (hasIntakeQuestions(intakeOnly)) return false;
+  const lines = t.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return false;
+  return lines.every((line) => {
+    const cleaned = cleanIntakeDisplayText(line.replace(/^\*\*+|\*\*+$/g, ""));
+    return isIntakeFooterLine(cleaned);
+  });
 }
 
 /** 只保留问卷段：遇方案标题/速览即截断，避免 plan 被当选项 */
@@ -151,10 +189,6 @@ function stripMd(line: string): string {
       .replace(/^#+\s*/, "")
       .trim(),
   );
-}
-
-function isIntakeFooterLine(t: string): boolean {
-  return /全部用默认|直接回复|请点击|确认提交|提交所选/i.test(t);
 }
 
 function tryParseOptionLine(line: string, block: IntakeBlock): boolean {

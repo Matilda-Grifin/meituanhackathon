@@ -32,7 +32,8 @@ class Settings(BaseSettings):
         default="http://127.0.0.1:9000", validation_alias="MOCK_SANDBOX_BASE_URL"
     )
     redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
-    use_open_meteo: bool = Field(default=True, validation_alias="USE_OPEN_METEO")
+    use_open_meteo: bool = Field(default=False, validation_alias="USE_OPEN_METEO")
+    weather_provider: str = Field(default="", validation_alias="WEATHER_PROVIDER")
 
 
 def get_settings() -> Settings:

@@ -4,7 +4,7 @@
 
 | 工具名 | 用途 | 主链路 |
 |--------|------|--------|
-| `lifecare__lifecare_get_weather` | Open-Meteo 多天预报；参数 `city`、`forecast_days`（1–16，默认 7）；`daily[]` 含 `date`/`weather`/`temp_max_c`/`temp_min_c` | 常用 |
+| `lifecare__lifecare_get_weather` | 高德天气多天预报（`provider=amap`）；失败时 Open-Meteo 兜底；参数 `city`、`forecast_days`（1–16，高德最多 4 天）；`daily[]` 含 `date`/`weather`/`temp_max_c`/`temp_min_c` | 常用 |
 | `lifecare__lifecare_search_places` | 高德 POI 关键字搜索；默认 `extensions=all` 并带 `reputation`（高德 rating 若存在 + 确定性 mock 口碑，全国可测） | 常用 |
 | `lifecare__lifecare_plan_route` | 高德驾车距离/时间 | 常用 |
 | `lifecare__lifecare_sandbox_catalog` | 沙盒餐厅/景点 id | 可选（沙盒演示） |

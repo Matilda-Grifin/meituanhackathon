@@ -129,13 +129,8 @@ def resolve_stage(state: dict[str, Any], policy: dict[str, Any]) -> str:
     if not slots.get("ready"):
         return "intake"
     if has_plan:
-        if detect_replan_intent(last_user):
-            return "followup_replan"
-        if detect_qa_intent(last_user, has_plan):
-            return "followup_qa"
-        if re.search(r"改|换|重新", last_user):
-            return "followup_replan"
-        return "followup_qa"
+        # 方案已交付：一律 followup_replan。是否搜点/改方案由 LLM 决定，harness 只控预算。
+        return "followup_replan"
     return "planning"
 
 

@@ -45,7 +45,7 @@ except ImportError as e:  # pragma: no cover
 
 mcp = FastMCP(
     "lifecare",
-    instructions="本地生活黑客松工具：高德 POI/驾车路线、Open-Meteo 天气、沙盒排队/客流/Mock 下单/打车估算。",
+    instructions="本地生活黑客松工具：高德 POI/驾车路线、高德天气（Open-Meteo 兜底）、沙盒排队/客流/Mock 下单/打车估算。",
 )
 
 
@@ -200,13 +200,12 @@ def lifecare_get_weather(
     forecast_days: int = 7,
 ) -> str:
     """
-    Open-Meteo 多天天气预报（免 Key，ECS 出网请求）。
+    高德天气多天预报（AMAP_KEY）；失败时 Open-Meteo 兜底。
 
-    - city：如「杭州」「北京」；与经纬度二选一，都缺省则用 DEFAULT_CITY / DEFAULT_LAT,LNG。
-    - forecast_days：从今天起连续天数，1–16（默认 7）。返回 daily[] 含 date、weather、最高/最低温。
-    - 查「明天/后天/未来一周」请设足够天数后在 daily 里按 date 取用，勿编造未返回的日期。
+    - city：如「杭州」「上海」；与经纬度二选一，都缺省则用 DEFAULT_CITY。
+    - forecast_days：从今天起连续天数，1–16（默认 7）。高德最多返回 4 天预报。
+    - 返回 daily[] 含 date、weather、最高/最低温；provider 为 amap 或 open-meteo。
     """
-    settings = get_settings()
     days = max(1, min(16, int(forecast_days)))
     args = {
         "city": city,
@@ -222,16 +221,12 @@ def lifecare_get_weather(
             {"city": city or "", "forecast_days": days},
             result_holder=holder,
         ):
-            if latitude is not None and longitude is not None:
-                label = (city or "").strip() or settings.default_city
-                data = weather_client.fetch_open_meteo(
-                    float(latitude),
-                    float(longitude),
-                    forecast_days=days,
-                    city_label=label,
-                )
-            else:
-                data = weather_client.fetch_weather_for_city(city, forecast_days=days)
+            data = weather_client.fetch_weather(
+                city=city,
+                latitude=latitude,
+                longitude=longitude,
+                forecast_days=days,
+            )
             out = json.dumps(data, ensure_ascii=False)
             holder["result"] = out
             return out

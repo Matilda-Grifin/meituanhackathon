@@ -920,6 +920,21 @@ button.danger {
   text-align: center;
 }
 
+.intake-bubble-footer-hint {
+  margin: 0.65rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fafafa;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+.intake-bubble--submitted .intake-bubble-footer-hint {
+  margin-top: 0.55rem;
+}
+
 .intake-bubble-intro {
   margin: 0 0 0.85rem;
   font-size: 0.9rem;

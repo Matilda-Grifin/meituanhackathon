@@ -66,8 +66,7 @@ def _stage_allows_tool(stage: str, tool: str, policy: dict, *, planning_intent: 
         return False, "tool_not_allowed_in_stage"
 
     if stage == "followup_qa":
-        if short in ("search_places", "plan_route", "get_weather"):
-            return False, "tool_not_allowed_in_followup_qa"
+        # 遗留 stage 名：与 followup_replan 同样放行出行工具（阶段路由已统一，此处兜底）
         return True, None
 
     if allow and short not in allowed and optional and short not in optional:

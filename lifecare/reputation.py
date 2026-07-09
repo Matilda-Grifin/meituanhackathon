@@ -96,7 +96,7 @@ def build_reputation_for_poi(
     合并高德（若有）与 mock，输出给 Agent 做权重字段。
     poi_raw: 高德 place/text 单条 POI 原始字典。
     """
-    pid = str(poi_raw.get("id") or "")
+    pid = _normalize_poi_id(poi_raw.get("id"))
     name = str(poi_raw.get("name") or "")
     ptype = str(poi_raw.get("type") or "")
     gaode = extract_gaode_biz(poi_raw)
@@ -193,6 +193,10 @@ def extract_photo_urls(poi_raw: dict[str, Any], *, limit: int = 3) -> list[str]:
     return urls
 
 
+def _normalize_poi_id(raw: Any) -> str:
+    return str(raw or "").strip().replace(" ", "")
+
+
 def enrich_pois_from_search(
     pois_raw: list[dict[str, Any]],
     *,
@@ -204,7 +208,7 @@ def enrich_pois_from_search(
         loc = (p.get("location") or "").split(",")
         lng = float(loc[0]) if len(loc) > 1 else None
         lat = float(loc[1]) if len(loc) > 1 else None
-        pid = p.get("id")
+        pid = _normalize_poi_id(p.get("id"))
         item: dict[str, Any] = {
             "id": pid,
             "name": p.get("name"),

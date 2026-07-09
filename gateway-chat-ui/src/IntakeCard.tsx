@@ -11,6 +11,8 @@ export type IntakeCardProps = {
   /** 口语发送后：选项全部置灰，不高亮任何 pill，不展示 Other 输入框 */
   grayAllOptions?: boolean;
   showDefault?: boolean;
+  /** Agent 原文 footer，如「或直接回复：全部用默认（默认：…）」 */
+  footerHint?: string;
   canSubmit: boolean;
   uiLocked: boolean;
   onSelect: (n: number, letter: string, isOther: boolean, hasFollowUp: boolean) => void;
@@ -31,6 +33,7 @@ export function IntakeCard({
   lockedHint,
   grayAllOptions,
   showDefault,
+  footerHint,
   canSubmit,
   uiLocked,
   onSelect,
@@ -103,9 +106,13 @@ export function IntakeCard({
         </div>
       ))}
       {locked ? (
-        <p className="intake-bubble-locked-hint">{lockedHint ?? "已确认，选项不可修改"}</p>
+        <>
+          <p className="intake-bubble-locked-hint">{lockedHint ?? "已确认，选项不可修改"}</p>
+          {footerHint ? <p className="intake-bubble-footer-hint">{footerHint}</p> : null}
+        </>
       ) : (
         <>
+          {footerHint ? <p className="intake-bubble-footer-hint">{footerHint}</p> : null}
           <p className="intake-bubble-edit-hint">可点选各题，或直接在下方输入框用口语回复</p>
           <div className="intake-bubble-actions">
             {showDefault ? (

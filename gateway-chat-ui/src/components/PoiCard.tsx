@@ -28,7 +28,10 @@ export function PoiCardSingle({ poi, userLocation }: PoiCardProps) {
     );
   }, [poi.location, userLocation]);
 
-  const href = poi.amap_place_url || `https://www.amap.com/place/${poi.id}`;
+  const poiId = poi.id.trim().replace(/\s+/g, "");
+  const href =
+    poi.amap_place_url?.trim().replace(/\s+/g, "") ||
+    `https://www.amap.com/place/${encodeURIComponent(poiId)}`;
   const costLabel = displayCost(poi.cost);
 
   return (
