@@ -104,9 +104,10 @@ import { ThinkingBubble } from "./components/ThinkingBubble";
 import { HistoryDrawer } from "./components/HistoryDrawer";
 import { MobileHeader } from "./components/MobileHeader";
 import { PlanMessageBody } from "./components/PlanMessageBody";
-import { RouteMapPreview } from "./components/RouteMap";
+import { RouteSheetOverlay } from "./components/RouteSheetOverlay";
 import { FollowUpChips } from "./components/FollowUpChips";
 import { MobileNotice } from "./components/MobileNotice";
+import { canShowRouteMap } from "./orderedPlanPois";
 
 async function waitUntil(
   timeoutMs: number,
@@ -1372,6 +1373,8 @@ export default function App() {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string>("");
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
+  const [routeSheetOpen, setRouteSheetOpen] = useState(false);
+  const [mobileHeaderView, setMobileHeaderView] = useState<"chat" | "route">("chat");
   const [mobileNotice, setMobileNotice] = useState("");
   const lastAssistantRowId = useRef<string | null>(null);
   const clientRef = useRef<GatewayBrowserClient | null>(null);
@@ -2170,6 +2173,37 @@ export default function App() {
 
   const sessionPoisRefreshKey = toolSteps.length + rows.length;
   const sessionPois = useSessionPois(sessionKey, sessionPoisRefreshKey);
+
+  const latestPlanText = useMemo(() => {
+    for (let i = displayRows.length - 1; i >= 0; i--) {
+      const r = displayRows[i]!;
+      if (String(r.role).toLowerCase() === "assistant" && isPlanMessage(r.text)) {
+        return r.text;
+      }
+    }
+    if (streaming && isPlanMessage(streaming)) return streaming;
+    return "";
+  }, [displayRows, streaming]);
+
+  const routeMapEnabled = useMemo(
+    () => mobileShell && Boolean(latestPlanText) && canShowRouteMap(latestPlanText, sessionPois),
+    [mobileShell, latestPlanText, sessionPois],
+  );
+
+  const openRouteSheet = useCallback(() => {
+    if (!routeMapEnabled) return;
+    setRouteSheetOpen(true);
+    setMobileHeaderView("route");
+  }, [routeMapEnabled]);
+
+  const closeRouteSheet = useCallback(() => {
+    setRouteSheetOpen(false);
+    setMobileHeaderView("chat");
+  }, []);
+
+  useEffect(() => {
+    if (!routeMapEnabled && routeSheetOpen) closeRouteSheet();
+  }, [routeMapEnabled, routeSheetOpen, closeRouteSheet]);
 
   const lastUserText = useMemo(() => lastUserTextInRows(rows), [rows]);
 
@@ -4131,7 +4165,17 @@ export default function App() {
           您未同意位置授权，本页功能已停用。请刷新页面后点击「同意」以继续使用。
         </div>
       ) : null}
-      {mobileShell ? <MobileHeader onMenu={() => setHistoryDrawerOpen(true)} /> : null}
+      {mobileShell ? (
+        <MobileHeader
+          onMenu={() => setHistoryDrawerOpen(true)}
+          view={mobileHeaderView}
+          routeEnabled={routeMapEnabled}
+          onViewChange={(view) => {
+            if (view === "route") openRouteSheet();
+            else closeRouteSheet();
+          }}
+        />
+      ) : null}
       {mobileShell ? (
         <HistoryDrawer
           open={historyDrawerOpen}
@@ -4410,6 +4454,7 @@ export default function App() {
                             text={userBubbleText}
                             pois={sessionPois}
                             userLocation={resolvedLocation}
+                            onOpenRouteSheet={openRouteSheet}
                           />
                         ) : (
                           <BubbleMarkdown text={userBubbleText} />
@@ -4419,20 +4464,6 @@ export default function App() {
                   </div>
                 ),
               });
-
-              if (mobileShell && isPlan) {
-                items.push({
-                  kind: "extras",
-                  key: `${r.id}-map`,
-                  node: (
-                    <RouteMapPreview
-                      pois={sessionPois}
-                      userLng={resolvedLocation?.lng}
-                      userLat={resolvedLocation?.lat}
-                    />
-                  ),
-                });
-              }
 
               if (
                 mobileShell &&
@@ -4553,6 +4584,7 @@ export default function App() {
                     text={liveStreamText}
                     pois={sessionPois}
                     userLocation={resolvedLocation}
+                    onOpenRouteSheet={openRouteSheet}
                   />
                 ) : shouldStreamMarkdown(liveStreamText) ? (
                   <StreamingMarkdown text={liveStreamText} />
@@ -4678,6 +4710,16 @@ export default function App() {
           <h2>Debug log</h2>
           <pre>{log.join("\n") || "…"}</pre>
         </section>
+      ) : null}
+      {mobileShell ? (
+        <RouteSheetOverlay
+          open={routeSheetOpen}
+          planText={latestPlanText}
+          pois={sessionPois}
+          sessionKey={sessionKey}
+          userLocation={resolvedLocation}
+          onClose={closeRouteSheet}
+        />
       ) : null}
         </div>
       </div>

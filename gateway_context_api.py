@@ -251,6 +251,25 @@ def api_session_pois(session_key: str) -> dict:
     return {"ok": True, "pois": [e.to_api_dict() for e in wl]}
 
 
+@app.get("/api/session-route")
+def api_session_route(
+    session_key: str,
+    plan_text: str = "",
+    include_polyline: bool = False,
+) -> dict:
+    """App 行程地图：按方案正文排序 POI + 段距/折线。"""
+    if not session_key.strip():
+        raise HTTPException(400, "session_key required")
+    from lifecare.harness.route_aggregate import build_session_route
+
+    st = load_state(session_key.strip())
+    return build_session_route(
+        st.get("tools_called") or [],
+        plan_text=plan_text,
+        include_polyline=include_polyline,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Eval manual test log — 前端人工评测 10 Tasks 结构化日志
 # ---------------------------------------------------------------------------

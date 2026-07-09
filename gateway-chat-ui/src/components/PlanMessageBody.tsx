@@ -1,19 +1,29 @@
 import type { ReactNode } from "react";
+import { canShowRouteMap, orderedPlanPois } from "../orderedPlanPois";
 import { BubbleMarkdown } from "../BubbleMarkdown";
 import { splitPlanWithPois } from "../planPoiEmbed";
-import { PoiCardSingle } from "./PoiCard";
 import type { ResolvedLocation } from "../location";
 import type { SessionPoi } from "../types/sessionPoi";
+import { RouteMapMini } from "./RouteMapMini";
+import { PoiCardSingle } from "./PoiCard";
 
 type PlanMessageBodyProps = {
   text: string;
   pois: SessionPoi[];
   userLocation: ResolvedLocation | null;
+  onOpenRouteSheet?: () => void;
 };
 
-export function PlanMessageBody({ text, pois, userLocation }: PlanMessageBodyProps) {
+export function PlanMessageBody({
+  text,
+  pois,
+  userLocation,
+  onOpenRouteSheet,
+}: PlanMessageBodyProps) {
   const segments = splitPlanWithPois(text, pois);
   const nodes: ReactNode[] = [];
+  const ordered = orderedPlanPois(text, pois);
+  const showMap = Boolean(onOpenRouteSheet) && canShowRouteMap(text, pois);
 
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]!;
@@ -27,6 +37,16 @@ export function PlanMessageBody({ text, pois, userLocation }: PlanMessageBodyPro
         </div>,
       );
     }
+  }
+
+  if (showMap) {
+    nodes.push(
+      <RouteMapMini
+        key="route-mini"
+        pois={ordered}
+        onExpand={() => onOpenRouteSheet?.()}
+      />,
+    );
   }
 
   return <div className="plan-message-body">{nodes}</div>;

@@ -12,6 +12,35 @@ from lifecare.reputation import enrich_pois_from_search
 AMAP_BASE = "https://restapi.amap.com/v3"
 
 
+def _decode_polyline(polyline: str) -> list[tuple[float, float]]:
+    out: list[tuple[float, float]] = []
+    for pair in (polyline or "").split(";"):
+        pair = pair.strip()
+        if "," not in pair:
+            continue
+        lng_s, lat_s = pair.split(",", 1)
+        try:
+            out.append((float(lng_s), float(lat_s)))
+        except ValueError:
+            continue
+    return out
+
+
+def _path_from_direction(data: dict[str, Any]) -> list[dict[str, float]]:
+    pts: list[dict[str, float]] = []
+    route = data.get("route") or {}
+    paths = route.get("paths") or []
+    if not paths:
+        return pts
+    steps = paths[0].get("steps") or []
+    for step in steps:
+        for lng, lat in _decode_polyline(str(step.get("polyline") or "")):
+            if pts and pts[-1]["lng"] == lng and pts[-1]["lat"] == lat:
+                continue
+            pts.append({"lng": lng, "lat": lat})
+    return pts
+
+
 def _poi_cache_key(keywords: str, city: str, extensions: str, attach_mock: bool) -> str:
     h = hashlib.sha256(f"{city}|{keywords}|{extensions}|{int(attach_mock)}".encode()).hexdigest()[:24]
     return f"lifecare:amap:poi:{h}"
@@ -92,7 +121,12 @@ def search_poi_text(
 
 
 def plan_route_driving(
-    origin_lng: float, origin_lat: float, dest_lng: float, dest_lat: float
+    origin_lng: float,
+    origin_lat: float,
+    dest_lng: float,
+    dest_lat: float,
+    *,
+    include_polyline: bool = False,
 ) -> dict[str, Any]:
     """驾车路径规划（简化为一条方案的距离/时间）。"""
     settings = get_settings()
@@ -124,10 +158,13 @@ def plan_route_driving(
             p0 = paths[0]
             out = {
                 "ok": True,
+                "mode": "driving",
                 "distance_m": int(p0.get("distance", 0)),
                 "duration_s": int(p0.get("duration", 0)),
                 "taxi_cost_hint": p0.get("taxi_cost"),
             }
+            if include_polyline:
+                out["path"] = _path_from_direction(data)
     if not out.get("ok"):
         out["error"] = data.get("info") or "route failed"
 
@@ -136,7 +173,12 @@ def plan_route_driving(
 
 
 def plan_route_walking(
-    origin_lng: float, origin_lat: float, dest_lng: float, dest_lat: float
+    origin_lng: float,
+    origin_lat: float,
+    dest_lng: float,
+    dest_lat: float,
+    *,
+    include_polyline: bool = False,
 ) -> dict[str, Any]:
     """步行路径规划：距离(米)、时间(秒)。"""
     settings = get_settings()
@@ -171,6 +213,8 @@ def plan_route_walking(
                 "distance_m": int(p0.get("distance", 0)),
                 "duration_s": int(p0.get("duration", 0)),
             }
+            if include_polyline:
+                out["path"] = _path_from_direction(data)
     if not out.get("ok"):
         out["error"] = data.get("info") or "walking route failed"
 
