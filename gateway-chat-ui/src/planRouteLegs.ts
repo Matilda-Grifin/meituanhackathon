@@ -44,13 +44,7 @@ function parseDistanceDuration(text: string): { distance_m?: number; duration_s?
   return { distance_m, duration_s };
 }
 
-function buildLabel(mode: RouteLegMode, distance_m: number, duration_s: number, raw?: string): string {
-  if (raw && raw.trim().length >= 6 && raw.length <= 80) {
-    const trimmed = raw.replace(/\s+/g, " ").trim();
-    if (/公里|分钟|步行|打车|驾车|地铁|km|m/.test(trimmed)) {
-      return trimmed.length > 48 ? `${trimmed.slice(0, 48)}…` : trimmed;
-    }
-  }
+function buildLabel(mode: RouteLegMode, distance_m: number, duration_s: number): string {
   const icon = legIcon(mode);
   const km =
     distance_m >= 1000
@@ -60,8 +54,18 @@ function buildLabel(mode: RouteLegMode, distance_m: number, duration_s: number, 
   return `${icon} ${km} · ${min}分钟`;
 }
 
+function isCleanCommuteLabel(raw: string): boolean {
+  if (raw.length < 4 || raw.length > 48) return false;
+  if (/https?:|amap\.com|www\.|\/place\/|[|]/.test(raw)) return false;
+  // 必须是通勤语义，且不能仅靠单个字母 m 误匹配 URL
+  return /(?:\d+(?:\.\d+)?\s*(?:km|公里|米|m\b)|\d+\s*分钟|步行|打车|驾车|地铁|🚗|🚶|🚇|🚲)/.test(
+    raw,
+  );
+}
+
 export function formatRouteLegDisplay(leg: SessionRouteLeg): string {
-  if (leg.label) return leg.label;
+  const raw = leg.label?.trim();
+  if (raw && isCleanCommuteLabel(raw)) return raw;
   return buildLabel(leg.mode, leg.distance_m, leg.duration_s);
 }
 
@@ -86,19 +90,15 @@ export function buildLegsFromPlanText(
       parsed.duration_s ??
       Math.max(60, Math.round((distance_m / (mode === "walking" ? 1.2 : 8)) ));
 
-    const snippet = between
-      .replace(/[#*!\[\]()]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 80);
-
     legs.push({
       from_poi_id: from.id,
       to_poi_id: to.id,
       mode,
       distance_m,
       duration_s,
-      label: buildLabel(mode, distance_m, duration_s, snippet || undefined),
+      // 不传 snippet：方案正文前段总是 POI 描述/图片/链接，
+      // 用解析好的数字直接生成干净的通勤标签（如「🚗 1.3km · 5分钟」）。
+      label: buildLabel(mode, distance_m, duration_s),
       source: parsed.distance_m || parsed.duration_s ? "plan_text" : "estimated",
     });
   }

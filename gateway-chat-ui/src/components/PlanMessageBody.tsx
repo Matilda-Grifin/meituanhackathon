@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { canShowRouteMap, orderedPlanPois } from "../orderedPlanPois";
+import { useMemo, type ReactNode } from "react";
+import { orderedPlanPois } from "../orderedPlanPois";
 import { BubbleMarkdown } from "../BubbleMarkdown";
 import { splitPlanWithPois } from "../planPoiEmbed";
 import type { ResolvedLocation } from "../location";
@@ -22,8 +22,8 @@ export function PlanMessageBody({
 }: PlanMessageBodyProps) {
   const segments = splitPlanWithPois(text, pois);
   const nodes: ReactNode[] = [];
-  const ordered = orderedPlanPois(text, pois);
-  const showMap = Boolean(onOpenRouteSheet) && canShowRouteMap(text, pois);
+  const ordered = useMemo(() => orderedPlanPois(text, pois), [text, pois]);
+  const showMap = Boolean(onOpenRouteSheet) && ordered.length >= 2;
 
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]!;

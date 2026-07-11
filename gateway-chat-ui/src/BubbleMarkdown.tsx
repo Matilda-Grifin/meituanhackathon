@@ -43,6 +43,8 @@ export function BubbleMarkdown({
             const body = String(children).replace(/\n$/, "");
             const lang = /language-(\w+)/.exec(className ?? "")?.[1];
             if (lang === "mermaid") {
+              // App 壳不渲染 Mermaid 动线图（RouteSheet 地图已承载动线）
+              if (light) return null;
               if (!mermaidOk) {
                 return (
                   <pre className="md-pre md-mermaid-pending">

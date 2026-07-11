@@ -115,6 +115,26 @@ def _parse_distance_duration(text: str) -> tuple[int | None, int | None]:
     return distance_m, duration_s
 
 
+def _leg_icon(mode: str) -> str:
+    if mode in ("driving", "taxi"):
+        return "🚗"
+    if mode == "transit":
+        return "🚇"
+    if mode == "bicycling":
+        return "🚲"
+    return "🚶"
+
+
+def _build_leg_label(mode: str, distance_m: int, duration_s: int) -> str:
+    km = (
+        f"{distance_m / 1000:.1f}km"
+        if distance_m >= 1000
+        else f"{int(distance_m)}m"
+    )
+    minutes = max(1, round(duration_s / 60))
+    return f"{_leg_icon(mode)} {km} · {minutes}分钟"
+
+
 def _haversine_m(lng1: float, lat1: float, lng2: float, lat2: float) -> float:
     import math
 
@@ -277,10 +297,6 @@ def build_session_route(
             speed = 1.2 if route_mode == "walking" else 8.0
             duration_s = max(60, int(distance_m / speed))
 
-        label = between.replace("\n", " ").strip()
-        if len(label) > 80:
-            label = label[:80] + "…"
-
         legs.append(
             {
                 "from_poi_id": prev_e.id,
@@ -288,7 +304,11 @@ def build_session_route(
                 "mode": mode if mode != "unknown" else route_mode,
                 "distance_m": distance_m,
                 "duration_s": duration_s,
-                "label": label or None,
+                "label": _build_leg_label(
+                    mode if mode != "unknown" else route_mode,
+                    int(distance_m),
+                    int(duration_s),
+                ),
                 "source": source,
             }
         )

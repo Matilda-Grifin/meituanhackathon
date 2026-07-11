@@ -640,6 +640,14 @@ function shouldSkipEarlyFlushAckForPlanPhase(
   );
 }
 
+function isPlanPhaseAckNoise(text: string): boolean {
+  const t = stripLeadingAssistantPlaceholders(text).trim();
+  if (!t) return true;
+  if (isPlanMessage(t) || isIntakeQuestionText(t)) return false;
+  if (isAckMessage(t)) return true;
+  return /^(好|好的|收到|明白|嗯|嗯嗯|可以|行|行的|ok|okay|当然|没问题)$/i.test(t);
+}
+
 /** 槽位提交/API 载荷用户行：不在对话区单独展示（保留在 intake 卡片内） */
 function isIntakeDisplayHiddenUserRow(text: string): boolean {
   const t = text.trim();
@@ -1374,7 +1382,6 @@ export default function App() {
   const [activeThreadId, setActiveThreadId] = useState<string>("");
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
   const [routeSheetOpen, setRouteSheetOpen] = useState(false);
-  const [mobileHeaderView, setMobileHeaderView] = useState<"chat" | "route">("chat");
   const [mobileNotice, setMobileNotice] = useState("");
   const lastAssistantRowId = useRef<string | null>(null);
   const clientRef = useRef<GatewayBrowserClient | null>(null);
@@ -2171,7 +2178,10 @@ export default function App() {
     return toolSteps;
   }, [hasVisibleUserMessage, suppressToolProgress, toolSteps]);
 
-  const sessionPoisRefreshKey = toolSteps.length + rows.length;
+  const sessionPoisRefreshKey = useMemo(
+    () => rows.map((r) => `${r.id}:${r.text.length}`).join("|"),
+    [rows],
+  );
   const sessionPois = useSessionPois(sessionKey, sessionPoisRefreshKey);
 
   const latestPlanText = useMemo(() => {
@@ -2193,12 +2203,10 @@ export default function App() {
   const openRouteSheet = useCallback(() => {
     if (!routeMapEnabled) return;
     setRouteSheetOpen(true);
-    setMobileHeaderView("route");
   }, [routeMapEnabled]);
 
   const closeRouteSheet = useCallback(() => {
     setRouteSheetOpen(false);
-    setMobileHeaderView("chat");
   }, []);
 
   useEffect(() => {
@@ -2336,16 +2344,19 @@ export default function App() {
 
   const liveStreamText = useMemo(
     () => {
-      // 与 tryEarlyFlushAck 同一判定：B 阶段/追问轮纯 ack 不在对话区闪现
-      const suppressAck = shouldSkipEarlyFlushAckForPlanPhase(
-        rowsRef.current,
-        optimisticUserRef.current,
-        {
-          toolStarted: toolStartedThisRunRef.current,
-          hadSearch: hadSearchPlacesRef.current,
-          historyHadSearch: historyHadSearchRef.current,
-        },
-      );
+      // B 阶段（intakeLocked=true）或追问轮：ack 不在对话区闪现
+      const suppressAck =
+        intakeLocked ||
+        shouldSkipEarlyFlushAckForPlanPhase(
+          rowsRef.current,
+          optimisticUserRef.current,
+          {
+            toolStarted: toolStartedThisRunRef.current,
+            hadSearch: hadSearchPlacesRef.current,
+            historyHadSearch: historyHadSearchRef.current,
+          },
+        );
+      if (suppressAck && isPlanPhaseAckNoise(streaming)) return "";
       return liveStreamDisplayText(
         streaming,
         ackTextThisRunRef.current,
@@ -2354,7 +2365,7 @@ export default function App() {
         suppressAck,
       );
     },
-    [streaming, ackFlushedTick, pinnedSkipIntakeAck],
+    [streaming, ackFlushedTick, pinnedSkipIntakeAck, intakeLocked],
   );
 
   const formalContentStarted = useMemo(() => {
@@ -2714,6 +2725,15 @@ export default function App() {
   const flushStreamingIntoRows = useCallback(() => {
     const streamBuf = stripLeadingAssistantPlaceholders(streamingRef.current.trim());
     if (!streamBuf || isEmptyAssistantPlaceholder(streamBuf) || isLocationBootstrapGreeting(streamBuf)) return;
+    const suppressAck =
+      intakeLocked ||
+      shouldSkipEarlyFlushAckForPlanPhase(rowsRef.current, optimisticUserRef.current, {
+        toolStarted: toolStartedThisRunRef.current,
+        hadSearch: hadSearchPlacesRef.current,
+        historyHadSearch: historyHadSearchRef.current,
+        intakeViaFreetext: intakeViaFreetextRef.current,
+      });
+    if (suppressAck && isPlanPhaseAckNoise(streamBuf)) return;
     setRows((prev) => {
       const last = prev[prev.length - 1];
       if (last && String(last.role).toLowerCase() === "assistant" && last.text === streamBuf) {
@@ -2751,7 +2771,7 @@ export default function App() {
     });
     setStreaming("");
     void maybeApplyHarnessToLastAssistant();
-  }, [maybeApplyHarnessToLastAssistant]);
+  }, [maybeApplyHarnessToLastAssistant, intakeLocked]);
 
   const flushStreamingIntoRowsRef = useRef(flushStreamingIntoRows);
   useEffect(() => {
@@ -4165,17 +4185,7 @@ export default function App() {
           您未同意位置授权，本页功能已停用。请刷新页面后点击「同意」以继续使用。
         </div>
       ) : null}
-      {mobileShell ? (
-        <MobileHeader
-          onMenu={() => setHistoryDrawerOpen(true)}
-          view={mobileHeaderView}
-          routeEnabled={routeMapEnabled}
-          onViewChange={(view) => {
-            if (view === "route") openRouteSheet();
-            else closeRouteSheet();
-          }}
-        />
-      ) : null}
+      {mobileShell ? <MobileHeader onMenu={() => setHistoryDrawerOpen(true)} /> : null}
       {mobileShell ? (
         <HistoryDrawer
           open={historyDrawerOpen}

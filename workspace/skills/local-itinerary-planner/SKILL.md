@@ -35,10 +35,10 @@ description: 基于真实高德 POI 与天气的多日/半日动线；须覆盖�
 2. **出行日天气**：单独一节，数值来自本轮 `get_weather`；日期不一致须说明。  
 3. 行程速览：Markdown 表格（`天数/时段 | 安排 | 交通`）；交通列优先 `打车约 X km / Y 分钟`。  
 4. 分块详述：每段含 停留时长估算、选点理由、排队/预约/口味 提示。  
-5. 动线可视化：至少一种 — Mermaid（`flowchart` / `timeline`）或「点 A → 点 B」+ `lifecare__lifecare_plan_route` 的 分钟/公里。  
+5. 路段级说明：用「点 A → 点 B」+ `lifecare__lifecare_plan_route` 的 分钟/公里；**禁止** `## 动线示意` 与 Mermaid（App 壳 RouteSheet 地图已展示动线）。  
 6. 预算表：分项 + 总计区间（标注估算）。  
 7. Tips：预约、天气穿搭、闭馆、带娃等。  
-8. 图与链接：每个写入方案的 POI，若工具 JSON 里有 `amap_place_url`，必须在正文用 Markdown 链出 至少 1 条可点击地址；**模式② 改版时新推荐的每个 POI 亦同**（无 link = 未合规检索）。若有 `photo_urls` 则在 该 POI 所在时段段落中间 插 1～2 张 `![](url)`（禁止全部配图堆在文末）。都无则 Mermaid/表格即可。
+8. 图与链接：每个写入方案的 POI，若工具 JSON 里有 `amap_place_url`，必须在正文用 Markdown 链出 至少 1 条可点击地址；**模式② 改版时新推荐的每个 POI 亦同**（无 link = 未合规检索）。若有 `photo_urls` 则在 该 POI 所在时段段落中间 插 1～2 张 `![](url)`（禁止全部配图堆在文末）。都无则表格 + 文字段距即可。
 
 ## 步骤
 

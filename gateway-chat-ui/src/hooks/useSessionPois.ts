@@ -2,7 +2,16 @@ import { useEffect, useState } from "react";
 import { clientContextApiBase } from "../location";
 import type { SessionPoi } from "../types/sessionPoi";
 
-export function useSessionPois(sessionKey: string, refreshKey: number): SessionPoi[] {
+function poisSignature(pois: SessionPoi[]): string {
+  return pois
+    .map((p) => {
+      const loc = p.location;
+      return `${p.id}:${loc?.lng ?? ""},${loc?.lat ?? ""}`;
+    })
+    .join("|");
+}
+
+export function useSessionPois(sessionKey: string, refreshKey: string | number): SessionPoi[] {
   const [pois, setPois] = useState<SessionPoi[]>([]);
 
   useEffect(() => {
@@ -17,7 +26,10 @@ export function useSessionPois(sessionKey: string, refreshKey: number): SessionP
     void fetch(url)
       .then((r) => r.json())
       .then((d: { ok?: boolean; pois?: SessionPoi[] }) => {
-        if (!cancelled && d.ok && Array.isArray(d.pois)) setPois(d.pois);
+        if (!cancelled && d.ok && Array.isArray(d.pois)) {
+          const next = d.pois;
+          setPois((prev) => (poisSignature(prev) === poisSignature(next) ? prev : next));
+        }
       })
       .catch(() => {});
     return () => {

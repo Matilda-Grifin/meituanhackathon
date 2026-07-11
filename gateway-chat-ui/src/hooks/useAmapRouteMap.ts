@@ -37,6 +37,20 @@ const MAP_OPTS = {
   pitchEnable: false,
 };
 
+function poisSignature(pois: SessionPoi[]): string {
+  return pois
+    .map((p) => {
+      const loc = p.location;
+      return `${p.id}:${loc?.lng ?? ""},${loc?.lat ?? ""}`;
+    })
+    .join("|");
+}
+
+function pathSignature(path?: Array<[number, number]>): string {
+  if (!path?.length) return "";
+  return path.map(([lng, lat]) => `${lng},${lat}`).join("|");
+}
+
 function drawRoute(
   AMap: AmapLike,
   map: AmapMap,
@@ -91,12 +105,18 @@ export function useAmapRouteMap(
     zoom?: number;
   },
 ) {
+  const { enabled, activeIndex = null, path, zoom = 13 } = options;
   const mapRef = useRef<AmapMap | null>(null);
   const amapRef = useRef<AmapLike | null>(null);
+  const poisRef = useRef(pois);
+  poisRef.current = pois;
+  const pathRef = useRef(path);
+  pathRef.current = path;
   const [mapError, setMapError] = useState(false);
   const [mapReady, setMapReady] = useState(false);
 
-  const { enabled, activeIndex = null, path, zoom = 13 } = options;
+  const poisKey = poisSignature(pois);
+  const pathKey = pathSignature(path);
 
   useEffect(() => {
     const key = (import.meta.env.VITE_AMAP_JS_KEY as string | undefined)?.trim();
@@ -114,7 +134,8 @@ export function useAmapRouteMap(
         if (cancelled || !containerRef.current) return;
         amapRef.current = AMap;
 
-        const first = pois.find((p) => p.location?.lng != null && p.location?.lat != null);
+        const currentPois = poisRef.current;
+        const first = currentPois.find((p) => p.location?.lng != null && p.location?.lat != null);
         if (!first?.location) return;
 
         const map = new AMap.Map(containerRef.current, {
@@ -123,7 +144,7 @@ export function useAmapRouteMap(
           center: [first.location.lng, first.location.lat],
         });
         mapRef.current = map;
-        drawRoute(AMap, map, pois, activeIndex, path);
+        drawRoute(AMap, map, currentPois, null, pathRef.current);
         setMapReady(true);
       })
       .catch(() => {
@@ -137,18 +158,19 @@ export function useAmapRouteMap(
       amapRef.current = null;
       setMapReady(false);
     };
-  }, [enabled, containerRef, pois, zoom]);
+  }, [enabled, poisKey, zoom]);
 
   useEffect(() => {
     const map = mapRef.current;
     const AMap = amapRef.current;
     if (!map || !AMap || !mapReady) return;
-    drawRoute(AMap, map, pois, activeIndex ?? null, path);
-    if (activeIndex != null && pois[activeIndex]?.location) {
-      const loc = pois[activeIndex]!.location!;
+    const currentPois = poisRef.current;
+    drawRoute(AMap, map, currentPois, activeIndex ?? null, pathRef.current);
+    if (activeIndex != null && currentPois[activeIndex]?.location) {
+      const loc = currentPois[activeIndex]!.location!;
       map.setCenter([loc.lng, loc.lat]);
     }
-  }, [activeIndex, pois, path, mapReady]);
+  }, [activeIndex, poisKey, pathKey, mapReady]);
 
   const resize = () => {
     mapRef.current?.resize?.();

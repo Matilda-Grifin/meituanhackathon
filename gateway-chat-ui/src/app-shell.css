@@ -125,8 +125,8 @@ body:has(.app-mobile-viewport) {
 .mobile-header {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: calc(0.5rem + var(--safe-top)) 0.65rem 0.5rem;
+  justify-content: space-between;
+  padding: calc(0.5rem + var(--safe-top)) 0.85rem 0.5rem;
   background: var(--canvas);
   border-bottom: none;
   position: sticky;
@@ -135,46 +135,13 @@ body:has(.app-mobile-viewport) {
 }
 
 .mobile-header-spacer {
-  display: none;
+  width: 44px;
 }
 
 .mobile-header-brand {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.mobile-header-segmented {
-  display: flex;
-  background: rgb(0 0 0 / 6%);
-  border-radius: 20px;
-  padding: 2px;
-  flex-shrink: 0;
-}
-
-.mobile-seg-btn {
-  border: none;
-  background: transparent;
-  border-radius: 18px;
-  padding: 4px 12px;
-  font-size: 0.76rem;
-  font-family: inherit;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.mobile-seg-btn.on {
-  background: var(--surface);
-  color: var(--accent);
-  font-weight: 600;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 8%);
-}
-
-.mobile-seg-btn:disabled {
-  opacity: 0.38;
-  cursor: not-allowed;
 }
 
 .mobile-logo-icon {
@@ -746,6 +713,14 @@ body:has(.app-mobile-viewport) {
   box-shadow: 0 -6px 24px rgb(0 0 0 / 10%);
   position: relative;
   z-index: 2;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.route-sheet-panel::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .route-sheet-title {

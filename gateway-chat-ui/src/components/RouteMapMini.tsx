@@ -61,7 +61,7 @@ export function RouteMapMini({ pois, path, onExpand }: RouteMapMiniProps) {
       {mapError ? (
         <p className="plan-route-mini-fallback">地图加载失败，仍可查看下方路线列表</p>
       ) : (
-        <p className="plan-route-mini-hint">点击 ⤢ 查看完整路线 · 也可点顶栏「路线」</p>
+          <p className="plan-route-mini-hint">点击 ⤢ 查看完整路线</p>
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+import { stripMovementDiagramSection } from "./markdownUtils";
 import type { SessionPoi } from "./types/sessionPoi";
 
 export type PlanSegment =
@@ -21,6 +22,8 @@ const DAILY_SECTION_MARKERS: RegExp[] = [
 ];
 
 const IMAGE_LINE_RE = /^!\[[^\]]*\]\([^)]+\)$/;
+/** 高德图片域名，模型输出的 POI 配图 URL */
+const AUTONAVI_PHOTO_RE = /^!\[[^\]]*\]\(https?:\/\/[^)]+\)$/;
 const AMAP_HOST = String.raw`(?:www\.|uri\.)?amap\.com`;
 /** place id 可能含空格（模型抄写错误），匹配到 `)` 前整段 */
 const AMAP_PLACE_URL = String.raw`https?:\/\/${AMAP_HOST}\/place\/[^)]+`;
@@ -265,6 +268,30 @@ function cleanOrphanLinkBracket(text: string): string {
   );
 }
 
+/**
+ * POI 卡片插入后，跳过紧跟在链接/名称之后的独立图片行（如 store.is.autonavi.com/showpic/…）。
+ * 这些行在 POI 卡里已有缩略图，不应再以大图形式渲染。
+ */
+function skipTrailingPhotoLines(text: string, pos: number): number {
+  let end = pos;
+  for (;;) {
+    const rest = text.slice(end);
+    // 仅推进一行：先跳换行符
+    const nlMatch = rest.match(/^\r?\n/);
+    if (!nlMatch) break;
+    const nlLen = nlMatch[0].length;
+    const lineEnd = rest.indexOf("\n", nlLen);
+    const line = (lineEnd === -1 ? rest.slice(nlLen) : rest.slice(nlLen, lineEnd)).trim();
+    if (!line) { end += nlLen; continue; }             // 空行继续
+    if (AUTONAVI_PHOTO_RE.test(line) || IMAGE_LINE_RE.test(line)) {
+      end += lineEnd === -1 ? rest.length : lineEnd + 1;
+      continue;
+    }
+    break;
+  }
+  return end;
+}
+
 function poiInText(poi: SessionPoi, text: string): boolean {
   return findPoiAnchorInText(text, poi, 0) != null;
 }
@@ -408,13 +435,21 @@ function splitDailyWithPois(dailyText: string, pois: SessionPoi[]): PlanSegment[
       dailyText[embedStart] === "["
         ? consumeFullMarkdownAmapLinkAt(dailyText, embedStart)
         : null;
-    const blockEnd =
+    const rawBlockEnd =
       fullLinkEnd != null ? fullLinkEnd : consumePoiMediaAfter(dailyText, idx, matchLen);
+    // 消费紧跟在 POI 链接/名称后的独立图片行（POI 卡已有缩略图，不再大图渲染）
+    const blockEnd = skipTrailingPhotoLines(dailyText, rawBlockEnd);
     if (embedStart > cursor) {
-      segments.push({
-        kind: "text",
-        text: cleanOrphanLinkBracket(dailyText.slice(cursor, embedStart)),
-      });
+      // 截取 POI 卡前的文本段，同时去掉紧跟在 POI 名**前面**的图片行（如 "1![](url)"）。
+      // 这类图片是模型输出的 POI 配图，POI 卡缩略图已展示，不应再以大图渲染。
+      const rawBefore = dailyText.slice(cursor, embedStart);
+      const strippedBefore = rawBefore
+        .replace(/\n?\d*\s*!\[[^\]]*\]\(https?:\/\/[^)]+\)\s*$/, "")
+        .trimEnd();
+      const cleanedBefore = cleanOrphanLinkBracket(strippedBefore);
+      if (cleanedBefore.trim()) {
+        segments.push({ kind: "text", text: cleanedBefore });
+      }
     }
     segments.push({ kind: "poi", poi });
     cursor = blockEnd;
@@ -444,16 +479,17 @@ function splitDailyWithPois(dailyText: string, pois: SessionPoi[]): PlanSegment[
 
 /** 行程速览区纯文本；每日行程区内嵌地点栏并替换配图/链接 */
 export function splitPlanWithPois(planText: string, pois: SessionPoi[]): PlanSegment[] {
-  const dailyStart = findDailySectionStart(planText);
+  const cleaned = stripMovementDiagramSection(planText);
+  const dailyStart = findDailySectionStart(cleaned);
   const segments: PlanSegment[] = [];
 
   if (dailyStart > 0) {
-    segments.push({ kind: "text", text: planText.slice(0, dailyStart) });
-  } else if (dailyStart === planText.length) {
-    return [{ kind: "text", text: planText }];
+    segments.push({ kind: "text", text: cleaned.slice(0, dailyStart) });
+  } else if (dailyStart === cleaned.length) {
+    return [{ kind: "text", text: cleaned }];
   }
 
-  const dailyText = planText.slice(dailyStart);
+  const dailyText = cleaned.slice(dailyStart);
   segments.push(...splitDailyWithPois(dailyText, pois));
   return segments;
 }
