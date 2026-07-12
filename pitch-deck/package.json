@@ -1,8 +1,15 @@
 {
-  "name": "lifecare-pitch-deck",
+  "name": "xingtu-pitch-deck",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "node gen-qr.mjs && node build_deck.mjs",
+    "gen:qr": "node gen-qr.mjs",
+    "gen:journey": "node gen-image.mjs --out assets/journey-5steps.png --ratio 16:9 --prompt-file prompts/journey-5steps.txt",
+    "gen:image": "node gen-image.mjs"
+  },
   "dependencies": {
-    "pptxgenjs": "^3.12.0"
+    "pptxgenjs": "^3.12.0",
+    "qrcode": "^1.5.4"
   }
 }
