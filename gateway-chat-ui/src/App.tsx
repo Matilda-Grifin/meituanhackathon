@@ -3999,7 +3999,8 @@ export default function App() {
         ) : null}
 
         <div className="main-col">
-      {!compactUi ? (
+      {/* 开发调试面板：仅桌面非 compact；App 壳/评委模式隐藏 */}
+      {!mobileShell && !compactUi ? (
         <section className="panel">
             <label>
               Gateway WebSocket URL
@@ -4055,7 +4056,7 @@ export default function App() {
             )}
           </p>
         </section>
-      ) : !compactUi && displayStatus ? (
+      ) : !mobileShell && compactUi && displayStatus ? (
         <p className="compact-connecting" role="status">
           {displayStatus}
         </p>
@@ -4130,6 +4131,28 @@ export default function App() {
                 items.push({
                   kind: "extras",
                   key: `${r.id}-map`,
+                  node: (
+                    <RouteMapPreview
+                      pois={sessionPois}
+                      userLng={resolvedLocation?.lng}
+                      userLat={resolvedLocation?.lat}
+                    />
+                  ),
+                });
+              }
+
+              // 兜底：方案检测没命中，但会话里已有带坐标 POI，仍挂出地图
+              if (
+                mobileShell &&
+                !isPlan &&
+                rl === "assistant" &&
+                r.id === lastVisibleAssistantRowId &&
+                sessionPois.some((p) => p.location) &&
+                userBubbleText.trim().length >= 400
+              ) {
+                items.push({
+                  kind: "extras",
+                  key: `${r.id}-map-fallback`,
                   node: (
                     <RouteMapPreview
                       pois={sessionPois}
@@ -4226,6 +4249,25 @@ export default function App() {
               items.splice(insertAt, 0, thinkingItem);
             }
 
+            if (mobileShell && items.length === 0) {
+              return (
+                <div className="chat-welcome" key="welcome">
+                  <img
+                    className="chat-welcome-icon"
+                    src="/xiaoxing-logo.png"
+                    alt=""
+                    width={120}
+                    height={120}
+                    decoding="async"
+                  />
+                  <p className="chat-welcome-text">
+                    <span className="chat-welcome-line">你好，我是小星</span>
+                    <span className="chat-welcome-line">你的AI路线规划伙伴</span>
+                  </p>
+                </div>
+              );
+            }
+
             return items.map((it) => <Fragment key={it.key}>{it.node}</Fragment>);
           })()}
           {showLiveBubble &&
@@ -4316,7 +4358,7 @@ export default function App() {
                 mobileShell
                   ? showIntakeCard && !intakeLocked
                     ? "用口语回答即可，如：我们3个人，地铁出行…"
-                    : "有什么想调整的？"
+                    : "跟我说说你想去哪？"
                   : showIntakeCard && !intakeLocked
                     ? "用口语回答即可，如：我们3个人，地铁出行，不忌口…"
                     : "Enter 发送，Shift+Enter 换行"

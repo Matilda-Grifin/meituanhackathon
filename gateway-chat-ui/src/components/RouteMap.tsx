@@ -11,8 +11,9 @@ type RouteMapPreviewProps = {
 export function RouteMapPreview({ pois, userLng, userLat }: RouteMapPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [mapError, setMapError] = useState(false);
+  const [missingKey, setMissingKey] = useState(false);
 
   const points = pois
     .map((p) => p.location)
@@ -21,10 +22,16 @@ export function RouteMapPreview({ pois, userLng, userLat }: RouteMapPreviewProps
   useEffect(() => {
     const key = (import.meta.env.VITE_AMAP_JS_KEY as string | undefined)?.trim();
     const el = containerRef.current;
-    if (!key || !el || points.length < 1) return;
+    if (points.length < 1) return;
+    if (!key) {
+      setMissingKey(true);
+      return;
+    }
+    if (!el) return;
 
     let cancelled = false;
     setMapError(false);
+    setMissingKey(false);
 
     void loadAmap({ key, version: "2.0" })
       .then((AMap: {
@@ -89,7 +96,7 @@ export function RouteMapPreview({ pois, userLng, userLat }: RouteMapPreviewProps
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
-        {expanded ? "收起地图" : "展开路线地图"}
+        {expanded ? "收起路线地图" : "展开路线地图"}
       </button>
       <div
         ref={containerRef}
@@ -97,8 +104,11 @@ export function RouteMapPreview({ pois, userLng, userLat }: RouteMapPreviewProps
         role="img"
         aria-label="行程路线地图"
       />
+      {missingKey ? (
+        <p className="route-map-fallback">地图密钥未配置（VITE_AMAP_JS_KEY），暂时画不出来</p>
+      ) : null}
       {mapError ? (
-        <p className="route-map-fallback">地图加载失败，请检查 VITE_AMAP_JS_KEY 与白名单</p>
+        <p className="route-map-fallback">地图加载失败，请检查高德 JS Key 与域名白名单</p>
       ) : null}
     </div>
   );

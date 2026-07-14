@@ -6,6 +6,7 @@ html {
   height: 100%;
   overflow: hidden;
   scrollbar-gutter: stable;
+  -webkit-text-size-adjust: 100%;
 }
 
 *,
@@ -19,6 +20,7 @@ body {
   height: 100%;
   overflow: hidden;
   background: #0f1115;
+  overscroll-behavior: none;
 }
 
 #root {

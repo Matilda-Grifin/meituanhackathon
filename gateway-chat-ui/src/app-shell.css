@@ -31,20 +31,27 @@
   }
 }
 
-/* 真机：全屏无边框 */
+/* 真机：全屏无边框（固定视口高度，只让 .stream 内滚动） */
 @media (max-width: 768px) {
   .app-mobile-viewport {
-    min-height: 100dvh;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     height: 100dvh;
+    max-height: 100dvh;
     overflow: hidden;
   }
 
   .app-mobile-viewport > .app.app-mobile {
     width: 100%;
-    min-height: 100dvh;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
     border: none;
     border-radius: 0;
     box-shadow: none;
+    overflow: hidden;
   }
 }
 
@@ -52,12 +59,14 @@
   max-width: none;
   margin: 0;
   padding: 0;
-  min-height: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
   background: var(--canvas);
   color: var(--body);
   display: flex;
   flex-direction: column;
-  padding-bottom: var(--safe-bottom);
+  overflow: hidden;
 }
 
 html:has(.app-mobile-viewport),
@@ -65,33 +74,39 @@ body:has(.app-mobile-viewport) {
   overflow: hidden;
   height: 100%;
   min-height: 100%;
+  position: relative;
+  overscroll-behavior: none;
 }
 
 #root:has(.app-mobile-viewport) {
   height: 100%;
-  min-height: 100dvh;
+  min-height: 100%;
+  max-height: 100dvh;
   overflow: hidden;
 }
 
 .app.app-mobile .main-layout {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 0;
   margin-top: 0;
   gap: 0;
   grid-template-columns: unset;
+  overflow: hidden;
 }
 
 .app.app-mobile .main-col {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .app.app-mobile .chat {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -100,21 +115,66 @@ body:has(.app-mobile-viewport) {
   border-radius: 0;
   padding: 0;
   gap: 0;
+  overflow: hidden;
 }
 
 .app.app-mobile .stream {
-  flex: 1;
-  overflow-y: auto;
+  flex: 1 1 0;
+  min-height: 0;
+  height: 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior-y: contain;
   padding: 0.75rem 0.85rem 1rem;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  display: flex;
+  flex-direction: column;
 }
 
 .app.app-mobile .stream::-webkit-scrollbar {
   display: none;
   width: 0;
   height: 0;
+}
+
+.app.app-mobile .chat-welcome {
+  flex: 1;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2rem 1.5rem 4rem;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.app.app-mobile .chat-welcome-icon {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+.app.app-mobile .chat-welcome-text {
+  margin: 0;
+  max-width: none;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: center;
+}
+
+.app.app-mobile .chat-welcome-line {
+  display: block;
+  text-align: center;
 }
 
 .app.app-mobile .header {
@@ -128,8 +188,8 @@ body:has(.app-mobile-viewport) {
   padding: calc(0.5rem + var(--safe-top)) 0.85rem 0.5rem;
   background: var(--canvas);
   border-bottom: none;
-  position: sticky;
-  top: 0;
+  position: relative;
+  flex-shrink: 0;
   z-index: 20;
 }
 
@@ -144,16 +204,13 @@ body:has(.app-mobile-viewport) {
 }
 
 .mobile-logo-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--brand);
-  color: var(--brand-ink);
-  font-size: 0.85rem;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: transparent;
+  display: block;
+  flex-shrink: 0;
 }
 
 .mobile-header-title {
@@ -657,6 +714,7 @@ body:has(.app-mobile-viewport) {
 }
 
 .app.app-mobile .composer {
+  flex-shrink: 0;
   background: var(--canvas);
   border-top: none;
   padding: 0.45rem 0.75rem calc(0.45rem + var(--safe-bottom));

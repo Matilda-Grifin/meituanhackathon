@@ -1,0 +1,377 @@
+{
+  "preharnes_kpis": {
+    "n": 50,
+    "avg": 0.7378809523809525,
+    "full": 7,
+    "ge80": 24,
+    "ge50": 44,
+    "zero": 1,
+    "first_mean": 11.50874,
+    "first_med": 10.5995,
+    "sum_mean": 56.01926,
+    "sum_med": 50.709,
+    "first_le10": 22,
+    "first_le15": 44,
+    "first_n": 50
+  },
+  "harness_kpis": {
+    "n": 49,
+    "avg": 0.7253887269193393,
+    "full": 10,
+    "ge80": 23,
+    "ge50": 43,
+    "zero": 3,
+    "first_mean": 10.631938775510203,
+    "first_med": 10.205,
+    "sum_mean": 48.78497959183674,
+    "sum_med": 46.953,
+    "first_le10": 23,
+    "first_le15": 46,
+    "first_n": 49
+  },
+  "deltas": [
+    {
+      "task_id": "T063_031",
+      "harness": 0.875,
+      "pre": 0.0,
+      "delta": -0.875,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_035",
+      "harness": 1.0,
+      "pre": 0.375,
+      "delta": -0.625,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_016",
+      "harness": 0.625,
+      "pre": 0.125,
+      "delta": -0.5,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_048",
+      "harness": 1.0,
+      "pre": 0.5555555555555556,
+      "delta": -0.4444444444444444,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_017",
+      "harness": 0.875,
+      "pre": 0.5,
+      "delta": -0.375,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_006",
+      "harness": 1.0,
+      "pre": 0.75,
+      "delta": -0.25,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_012",
+      "harness": 0.5,
+      "pre": 0.25,
+      "delta": -0.25,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_021",
+      "harness": 1.0,
+      "pre": 0.75,
+      "delta": -0.25,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_025",
+      "harness": 1.0,
+      "pre": 0.75,
+      "delta": -0.25,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_030",
+      "harness": 0.875,
+      "pre": 0.625,
+      "delta": -0.25,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_033",
+      "harness": 0.625,
+      "pre": 0.375,
+      "delta": -0.25,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_047",
+      "harness": 1.0,
+      "pre": 0.75,
+      "delta": -0.25,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_046",
+      "harness": 0.7777777777777778,
+      "pre": 0.5555555555555556,
+      "delta": -0.2222222222222222,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_024",
+      "harness": 1.0,
+      "pre": 0.8571428571428571,
+      "delta": -0.1428571428571429,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_003",
+      "harness": 0.5,
+      "pre": 0.375,
+      "delta": -0.125,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_011",
+      "harness": 1.0,
+      "pre": 0.875,
+      "delta": -0.125,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_018",
+      "harness": 1.0,
+      "pre": 0.875,
+      "delta": -0.125,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_022",
+      "harness": 0.875,
+      "pre": 0.75,
+      "delta": -0.125,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_029",
+      "harness": 0.625,
+      "pre": 0.5,
+      "delta": -0.125,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_043",
+      "harness": 0.7777777777777778,
+      "pre": 0.6666666666666666,
+      "delta": -0.11111111111111116,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_008",
+      "harness": 0.875,
+      "pre": 0.875,
+      "delta": 0.0,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_009",
+      "harness": 0.875,
+      "pre": 0.875,
+      "delta": 0.0,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_010",
+      "harness": 1.0,
+      "pre": 1.0,
+      "delta": 0.0,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_015",
+      "harness": 0.875,
+      "pre": 0.875,
+      "delta": 0.0,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_027",
+      "harness": 0.625,
+      "pre": 0.625,
+      "delta": 0.0,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_032",
+      "harness": 0.875,
+      "pre": 0.875,
+      "delta": 0.0,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_034",
+      "harness": 0.875,
+      "pre": 0.875,
+      "delta": 0.0,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_038",
+      "harness": 0.75,
+      "pre": 0.75,
+      "delta": 0.0,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_039",
+      "harness": 0.5714285714285714,
+      "pre": 0.5714285714285714,
+      "delta": 0.0,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_045",
+      "harness": 0.7777777777777778,
+      "pre": 0.7777777777777778,
+      "delta": 0.0,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_049",
+      "harness": 0.875,
+      "pre": 0.875,
+      "delta": 0.0,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_044",
+      "harness": 0.8,
+      "pre": 0.9,
+      "delta": 0.09999999999999998,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_050",
+      "harness": 0.7777777777777778,
+      "pre": 0.8888888888888888,
+      "delta": 0.11111111111111105,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_042",
+      "harness": 0.8888888888888888,
+      "pre": 1.0,
+      "delta": 0.11111111111111116,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_002",
+      "harness": 0.75,
+      "pre": 0.875,
+      "delta": 0.125,
+      "skipped": true
+    },
+    {
+      "task_id": "T063_019",
+      "harness": 0.625,
+      "pre": 0.75,
+      "delta": 0.125,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_023",
+      "harness": 0.625,
+      "pre": 0.75,
+      "delta": 0.125,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_028",
+      "harness": 0.625,
+      "pre": 0.75,
+      "delta": 0.125,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_040",
+      "harness": 0.75,
+      "pre": 0.875,
+      "delta": 0.125,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_SAMPLE_001",
+      "harness": 0.875,
+      "pre": 1.0,
+      "delta": 0.125,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_004",
+      "harness": 0.7142857142857143,
+      "pre": 0.8571428571428571,
+      "delta": 0.1428571428571428,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_014",
+      "harness": 0.75,
+      "pre": 1.0,
+      "delta": 0.25,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_005",
+      "harness": 0.5,
+      "pre": 0.875,
+      "delta": 0.375,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_036",
+      "harness": 0.375,
+      "pre": 0.75,
+      "delta": 0.375,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_041",
+      "harness": 0.3333333333333333,
+      "pre": 1.0,
+      "delta": 0.6666666666666667,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_037",
+      "harness": 0.25,
+      "pre": 1.0,
+      "delta": 0.75,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_013",
+      "harness": 0.0,
+      "pre": 0.875,
+      "delta": 0.875,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_026",
+      "harness": 0.0,
+      "pre": 0.8888888888888888,
+      "delta": 0.8888888888888888,
+      "skipped": null
+    },
+    {
+      "task_id": "T063_020",
+      "harness": 0.0,
+      "pre": 1.0,
+      "delta": 1.0,
+      "skipped": null
+    }
+  ]
+}

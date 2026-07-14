@@ -12,6 +12,7 @@ dist
 dist-app
 dist-ssr
 *.local
+.venv-img/
 
 # 生产构建注入的网关 token 等（勿提交）
 .env.production

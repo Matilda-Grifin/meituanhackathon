@@ -1,0 +1,383 @@
+{
+  "run_at": "2026-07-13T17:31:29.296417+00:00",
+  "task_id": "T063_022",
+  "pipeline": "vitabench_eval_v63",
+  "session_id": "v63-T063_022-bcda93cd",
+  "termination": "user_stop",
+  "steps": 2,
+  "num_errors": 0,
+  "max_steps": 100,
+  "max_errors": 10,
+  "trajectory": [
+    {
+      "role": "user",
+      "content": "想在成都城里玩一天，晚上可能有演出",
+      "turn": 1
+    },
+    {
+      "role": "assistant",
+      "content": "我了解啦，您想在成都锦江区春熙路附近出发，在城里玩一天，晚上安排演出活动，偏好小吃街、串串，人均预算30~80元，出行半径不超过8km。目前还需要确认3个信息：\n\n1. 您打算哪天出发游玩？\nA. 今天下午（从当前14:00开始玩到晚上）\nB. 明天出发\nC. 周末出发\nD. 其他时间（请说明）\n\n2. 请问您一共多少人同行？\nA. 1人\nB. 2人\nC. 3-4人\nD. 5人及以上\n\n3. 您对白天游玩景点类型有什么偏好？\nA. 人文景点（博物馆、古街等）\nB. 城市休闲（公园、商圈逛吃）\nC. 主题游乐（场馆、体验店）\nD. 户外散步\nE. 以上都可以，重点保证晚上看演出\n\n或直接回复：全部用默认（默认：今天下午出发，2人同行，白天兼顾逛吃休闲，重点安排晚上演出）",
+      "turn": 1,
+      "tools": [],
+      "tool_calls": [],
+      "time_to_first_assistant_text_ms": null,
+      "duration_ms": 12240,
+      "harness": {
+        "skipped": true,
+        "repairs_applied": [],
+        "checklist_missing": [],
+        "poi_audit": {}
+      },
+      "assistant_text_raw": null
+    },
+    {
+      "role": "user",
+      "content": "我们一共4个人，预算是人均30到80元，饮食要重辣，大概早上8点左右出门玩一天哦。",
+      "turn": 2
+    },
+    {
+      "role": "assistant",
+      "content": "钢管厂五区小郡肝串串香(新华公园总店)（[钢管厂五区小郡肝串串香(新华公园总店) →](https://www.amap.com/place/B0FFH0HYZI)）\n从锦江区春熙三圣花乡旅游区（[三圣花乡旅游区 →](https://www.amap.com/place/B0FFH6Y6QZ)）玩不超过響Livehouse(成都店)(暂停营业)（[響Livehouse(成都店)(暂停营业) →](https://www.amap.com/plac叁角叁串串香（[叁角叁串串香 →](https://www.amap.com/place/B0K0D1GWCM)）J1OMELP9)）吃+休闲+晚间演出，非常适合4人好友聚会。\n\n## 今日天气\n今日成都多云转阵雨，最高气温36℃，最低26℃，白天天气炎热，傍晚可能有阵雨，建议做好防暑并携带便携雨伞。\n\n## ## 🌤 出行日天气\n\n三圣花乡旅游区 App 为准；若工具返回日期与出行日不一致，出发前请再次确认。\n\n行程速览\n| 时段 | 行程内容 | 交通方式 | 预计耗时 |\n|------|----------|三圣花乡旅游区----------|\n| 08:00-08:30 | 春熙路出发 → 东湖公园 | 打车 | 约20分钟（6三圣花乡旅游区） |\n| 08:30-11:30 | 东湖公园散步休闲 | 步行 | 3小时 |\n| 11:30-13:30 | 返回春熙路 → 午餐串串 | 打车 | 约16分钟（5.9km） |\n| 14:00-18:00 | 春熙路步行街逛吃+小吃街 | 步行 | 4小时 |\n| 18:30-19:30 | 前往Livehouse | 打车 | 约17分钟（9.4km，略超8km半径，可接受） |\n| 20:00-22:30 | 观看演出 |  | 2.5小时 |\n\n---\n\n## 分时段详细安排\n\n### 08:30-11:30 东湖公园晨逛休闲\n![](http://store.is.autonavi.com/showpic/a8c6165a50c73841b5eb7e62747c2fa9)\n\n[东湖公园华LIVEHOUSE(成都店)(暂停营业)（[华LIVEHOUSE(成都店)(暂停营业) →](https://www.amap.com/place/B0GD3M3IAR)）1C7WGEA)位于二环路东五段，靠近锦江，环境清幽，是成都市区难得的城市湿地。早晨气温相对凉爽，非常适合散步放松，4人可以沿着湖边走走，拍照打卡，公园免费开放，无需预约。\n\n- 停留建议：3小时\n- 推荐路线：从南大门进 → 沿湖边步道走一圈 → 打卡东湖摩天轮，整体轻松不累\n\n### 12:00-13:30 午餐：龙户人家串串香（春熙路店）\n![](https://store.is.autonavi.com/showpic/5f1a028787188d69cd0028c97dc71863)\n\n[龙户人家串串香店(春熙路店)](https://www.amap.com/place/B0LATS7BTE)就在春熙路附近，步行可达，人均约73元，正好符合你30-80元的预算。这家店牛油锅底口味正宗，能做重辣，符合你的口味要求，性价比不错，口碑也较好。\n\n- 推荐点单：牛肉串、郡肝、贡菜，搭配冰粉解辣\n- 提示：饭点可能需要排队，建议可以错峰11:30到，避开人流\n\n### 14:00-18:00 春熙路步行街逛吃\n![](http://store.is.autonavi.com/showpic/023908e1ac8e27470b30bced7c4eb58c)\n\n[春熙路步行街](https://www.amap.com/place/B001C8RQLM)是成都最核心的商圈，不仅可以逛街购物，周边也隐藏了很多小吃。从王府井到IFS，一路可以边走边吃：龙抄手、钟水饺、三大炮、糖油果子等成都特色小吃都能找到，满足你对小吃街的需求。\n\n- 停留建议：可以慢慢逛4小时，累了可以找一家咖啡店休息\n- 推荐打卡：IFS楼顶大熊猫雕塑，拍照非常出片\n\n### 20:00-22:30 MAO Livehouse成都（一号馆）看演出\n![](https://store.is.autonavi.com/showpic/54982df67b3ae6b00000001075576196?type=pic)\n\n[MAO L水碾河刘老大串串香(水碾河路店)（[水碾河刘老大串串香(水碾河路店) →](https://www.amap.三圣花乡旅游区/place/B001C7SZJI)）一号馆)](三圣花乡旅游区ps://www.amap.com/place/B0M6XUQRJ三圣花乡旅游区成都非常热门的Livehouse场地，很多独立乐队都会来这里演出三圣花乡旅游区响效果好，氛围很棒。查询到另外两家市中心的Livehouse目前暂三圣花乡旅游区营业，距离春熙路约9.4公里，打车约17分钟可达，稍微超出你8公里的出行半径，但整体路程不远，非常适合晚上看演出。\n\n- 提示：观看演出建议提前在官方渠道购票，提前进场选好位置\n\n---\n\n## 预算参考（玉林串串香(总店)（[玉林串串香(总店) →](https://www.amap.com/place/B001C7Y028)）| 人均费用（元） | 4人总计（元） | 说明 |\n|------|----------------|---------------|------|\n| 分段打车 | 约25 | 100 | 涵盖全程各段交通 |\n| 午餐串串 | 约73 | 292 | 符合你人均30-80元餐饮预算 |\n| 小吃街消费 | 约30 | 120 | 随意品尝各类小吃 |\n| Livehouse演出 | 约130 | 520 | 票价以当日演出实际定价为准 |\n| **总计** | **约258** | **1032** | 可根据小吃和演出选择调整，控制总预算 |\n\n---\n\n## 出行Tips\n1. 今日白天温度较高，注意做好防晒防暑，及时补充水分\n2. 傍晚可能有阵雨，记得带一把折叠伞，晴雨两用\n3. 吃重辣串串建议搭配冰饮/冰粉，可以缓解辣味\n4. Livehouse演出一般提前30分钟检票，建议提前15分钟到达场地\n5. 所有推荐地点都可以点击链接直接在高德地图导航，非常方便\n\n有任何调整需求随时告诉我哦！\n\n> **说明**：文中涉及的用户偏好/部分口碑描述来自演示种子或合成字段，POI 名称与坐标以高德为准，不代表真实点评库条数。\n> **说明**：预算为根据公开票价与人均消费的估算区间，实际以到店/购票为准。\n> **预约**：热门场馆/餐厅建议提前在官方小程序预约。\n",
+      "turn": 2,
+      "tools": [
+        "lifecare__lifecare_get_weather",
+        "lifecare__lifecare_search_places",
+        "lifecare__lifecare_plan_route"
+      ],
+      "tool_calls": [],
+      "time_to_first_assistant_text_ms": null,
+      "duration_ms": 36530,
+      "harness": {
+        "skipped": false,
+        "repairs_applied": [
+          "mock_disclaimer",
+          "budget_estimate_notice",
+          "booking_reminder",
+          "weather_block",
+          "poi_whitelist"
+        ],
+        "checklist_missing": [
+          "weather_block"
+        ],
+        "poi_audit": {
+          "replacements": [
+            {
+              "from": "成都市区一日夜生活游玩方案（4人·重辣口味·含Livehouse）",
+              "to": "钢管厂五区小郡肝串串香(新华公园总店)",
+              "id": "B0FFH0HYZI"
+            },
+            {
+              "from": "今日天气",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "## 🌤 出行日天气",
+              "to": "響Livehouse(成都店)(暂停营业)",
+              "id": "B0J1OMELP9"
+            },
+            {
+              "from": "13:30 午餐：龙户人家串串香（春熙路店）",
+              "to": "华LIVEHOUSE(成都店)(暂停营业)",
+              "id": "B0GD3M3IAR"
+            },
+            {
+              "from": "预算参考（4人）",
+              "to": "水碾河刘老大串串香(水碾河路店)",
+              "id": "B001C7SZJI"
+            },
+            {
+              "from": "出行Tips",
+              "to": "玉林串串香(总店)",
+              "id": "B001C7Y028"
+            },
+            {
+              "from": "行程内容",
+              "to": "叁角叁串串香",
+              "id": "B0K0D1GWCM"
+            },
+            {
+              "from": "返回春熙路 → 午餐串串",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "前往Livehouse",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "观看演出",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "约25",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "约73",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "约30",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "约130",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "**约258**",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            }
+          ],
+          "removed": [],
+          "unmatched": [
+            "成都市区一日夜生活游玩方案（4人·重辣口味·含Livehouse）",
+            "今日天气",
+            "## 🌤 出行日天气",
+            "13:30 午餐：龙户人家串串香（春熙路店）",
+            "预算参考（4人）",
+            "出行Tips",
+            "行程内容",
+            "返回春熙路 → 午餐串串",
+            "前往Livehouse",
+            "观看演出",
+            "约25",
+            "约73",
+            "约30",
+            "约130",
+            "**约258**"
+          ],
+          "whitelist_size": 11
+        }
+      },
+      "assistant_text_raw": "# 成都市区一日夜生活游玩方案（4人·重辣口味·含Livehouse）\n从锦江区春熙路出发，全天游玩不超过8-10km出行半径，主打逛吃+休闲+晚间演出，非常适合4人好友聚会。\n\n## 今日天气\n今日成都多云转阵雨，最高气温36℃，最低26℃，白天天气炎热，傍晚可能有阵雨，建议做好防暑并携带便携雨伞。\n\n## 行程速览\n| 时段 | 行程内容 | 交通方式 | 预计耗时 |\n|------|----------|----------|----------|\n| 08:00-08:30 | 春熙路出发 → 东湖公园 | 打车 | 约20分钟（6.8km） |\n| 08:30-11:30 | 东湖公园散步休闲 | 步行 | 3小时 |\n| 11:30-13:30 | 返回春熙路 → 午餐串串 | 打车 | 约16分钟（5.9km） |\n| 14:00-18:00 | 春熙路步行街逛吃+小吃街 | 步行 | 4小时 |\n| 18:30-19:30 | 前往Livehouse | 打车 | 约17分钟（9.4km，略超8km半径，可接受） |\n| 20:00-22:30 | 观看演出 |  | 2.5小时 |\n\n---\n\n## 分时段详细安排\n\n### 08:30-11:30 东湖公园晨逛休闲\n![](http://store.is.autonavi.com/showpic/a8c6165a50c73841b5eb7e62747c2fa9)\n\n[东湖公园](https://www.amap.com/place/B001C7WGEA)位于二环路东五段，靠近锦江，环境清幽，是成都市区难得的城市湿地。早晨气温相对凉爽，非常适合散步放松，4人可以沿着湖边走走，拍照打卡，公园免费开放，无需预约。\n\n- 停留建议：3小时\n- 推荐路线：从南大门进 → 沿湖边步道走一圈 → 打卡东湖摩天轮，整体轻松不累\n\n### 12:00-13:30 午餐：龙户人家串串香（春熙路店）\n![](https://store.is.autonavi.com/showpic/5f1a028787188d69cd0028c97dc71863)\n\n[龙户人家串串香店(春熙路店)](https://www.amap.com/place/B0LATS7BTE)就在春熙路附近，步行可达，人均约73元，正好符合你30-80元的预算。这家店牛油锅底口味正宗，能做重辣，符合你的口味要求，性价比不错，口碑也较好。\n\n- 推荐点单：牛肉串、郡肝、贡菜，搭配冰粉解辣\n- 提示：饭点可能需要排队，建议可以错峰11:30到，避开人流\n\n### 14:00-18:00 春熙路步行街逛吃\n![](http://store.is.autonavi.com/showpic/023908e1ac8e27470b30bced7c4eb58c)\n\n[春熙路步行街](https://www.amap.com/place/B001C8RQLM)是成都最核心的商圈，不仅可以逛街购物，周边也隐藏了很多小吃。从王府井到IFS，一路可以边走边吃：龙抄手、钟水饺、三大炮、糖油果子等成都特色小吃都能找到，满足你对小吃街的需求。\n\n- 停留建议：可以慢慢逛4小时，累了可以找一家咖啡店休息\n- 推荐打卡：IFS楼顶大熊猫雕塑，拍照非常出片\n\n### 20:00-22:30 MAO Livehouse成都（一号馆）看演出\n![](https://store.is.autonavi.com/showpic/54982df67b3ae6b00000001075576196?type=pic)\n\n[MAO Livehouse成都(一号馆)](https://www.amap.com/place/B0M6XUQRJO)是成都非常热门的Livehouse场地，很多独立乐队都会来这里演出，场地音响效果好，氛围很棒。查询到另外两家市中心的Livehouse目前暂停营业，这家正常营业，距离春熙路约9.4公里，打车约17分钟可达，稍微超出你8公里的出行半径，但整体路程不远，非常适合晚上看演出。\n\n- 提示：观看演出建议提前在官方渠道购票，提前进场选好位置\n\n---\n\n## 预算参考（4人）\n| 项目 | 人均费用（元） | 4人总计（元） | 说明 |\n|------|----------------|---------------|------|\n| 分段打车 | 约25 | 100 | 涵盖全程各段交通 |\n| 午餐串串 | 约73 | 292 | 符合你人均30-80元餐饮预算 |\n| 小吃街消费 | 约30 | 120 | 随意品尝各类小吃 |\n| Livehouse演出 | 约130 | 520 | 票价以当日演出实际定价为准 |\n| **总计** | **约258** | **1032** | 可根据小吃和演出选择调整，控制总预算 |\n\n---\n\n## 出行Tips\n1. 今日白天温度较高，注意做好防晒防暑，及时补充水分\n2. 傍晚可能有阵雨，记得带一把折叠伞，晴雨两用\n3. 吃重辣串串建议搭配冰饮/冰粉，可以缓解辣味\n4. Livehouse演出一般提前30分钟检票，建议提前15分钟到达场地\n5. 所有推荐地点都可以点击链接直接在高德地图导航，非常方便\n\n有任何调整需求随时告诉我哦！"
+    },
+    {
+      "role": "user",
+      "content": "> **数据来源**：高德地图（2026年6月27日）\n> **免责声明**：出行前请确认最新开放信息，演出日期与阵容以官方发布为准。\n\n###STOP###",
+      "turn": 3
+    }
+  ],
+  "harness_summary": {
+    "turns": [
+      {
+        "turn": 1,
+        "skipped": true,
+        "repairs_applied": [],
+        "checklist_missing": [],
+        "poi_audit": {}
+      },
+      {
+        "turn": 2,
+        "skipped": false,
+        "repairs_applied": [
+          "mock_disclaimer",
+          "budget_estimate_notice",
+          "booking_reminder",
+          "weather_block",
+          "poi_whitelist"
+        ],
+        "checklist_missing": [
+          "weather_block"
+        ],
+        "poi_audit": {
+          "replacements": [
+            {
+              "from": "成都市区一日夜生活游玩方案（4人·重辣口味·含Livehouse）",
+              "to": "钢管厂五区小郡肝串串香(新华公园总店)",
+              "id": "B0FFH0HYZI"
+            },
+            {
+              "from": "今日天气",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "## 🌤 出行日天气",
+              "to": "響Livehouse(成都店)(暂停营业)",
+              "id": "B0J1OMELP9"
+            },
+            {
+              "from": "13:30 午餐：龙户人家串串香（春熙路店）",
+              "to": "华LIVEHOUSE(成都店)(暂停营业)",
+              "id": "B0GD3M3IAR"
+            },
+            {
+              "from": "预算参考（4人）",
+              "to": "水碾河刘老大串串香(水碾河路店)",
+              "id": "B001C7SZJI"
+            },
+            {
+              "from": "出行Tips",
+              "to": "玉林串串香(总店)",
+              "id": "B001C7Y028"
+            },
+            {
+              "from": "行程内容",
+              "to": "叁角叁串串香",
+              "id": "B0K0D1GWCM"
+            },
+            {
+              "from": "返回春熙路 → 午餐串串",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "前往Livehouse",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "观看演出",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "约25",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "约73",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "约30",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "约130",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            },
+            {
+              "from": "**约258**",
+              "to": "三圣花乡旅游区",
+              "id": "B0FFH6Y6QZ"
+            }
+          ],
+          "removed": [],
+          "unmatched": [
+            "成都市区一日夜生活游玩方案（4人·重辣口味·含Livehouse）",
+            "今日天气",
+            "## 🌤 出行日天气",
+            "13:30 午餐：龙户人家串串香（春熙路店）",
+            "预算参考（4人）",
+            "出行Tips",
+            "行程内容",
+            "返回春熙路 → 午餐串串",
+            "前往Livehouse",
+            "观看演出",
+            "约25",
+            "约73",
+            "约30",
+            "约130",
+            "**约258**"
+          ],
+          "whitelist_size": 11
+        }
+      }
+    ],
+    "repairs_total": 5,
+    "checklist_miss_total": 1,
+    "poi_replacements_total": 15
+  },
+  "reward_info": {
+    "reward": 0.875,
+    "full_success": false,
+    "rubric_states": {
+      "rubric_0": {
+        "rubric": "Agent 须调用天气工具查询成都在2026-06-27（或当次出行时段）的天气，并在方案中体现是否影响出行",
+        "justification": "Assistant在回复[4]中给出了今日（2026-06-27）成都多云转阵雨，最高36℃的天气信息，并提示防暑和携带雨伞。同时tool_calls中包含天气查询工具调用。满足要求（轮次[4]）。",
+        "meetExpectation": true
+      },
+      "rubric_1": {
+        "rubric": "Agent 须调用 POI 搜索工具，方案中引用的 POI 来自工具返回（含名称或可核对信息），不得纯编造",
+        "justification": "Assistant调用了POI搜索工具（lifecare__lifecare_search_places），并在方案中引用了东湖公园、龙户人家串串香、春熙路步行街、MAO Livehouse等POI，均附带了高德地图链接，可验证来自工具返回（轮次[4]）。",
+        "meetExpectation": true
+      },
+      "rubric_2": {
+        "rubric": "方案须同时包含玩乐/文化类与餐饮类 POI，至少3个可执行锚点（含正餐）",
+        "justification": "方案包含玩乐/文化类：东湖公园（晨逛）、春熙路步行街（逛街）、MAO Livehouse（演出）；餐饮类：龙户人家串串香（正餐）。共4个可执行锚点，满足至少3个要求（轮次[4]）。",
+        "meetExpectation": true
+      },
+      "rubric_3": {
+        "rubric": "餐饮须体现用户饮食要符合重辣及人均30~80元约束",
+        "justification": "龙户人家串串香标注人均约73元，符合30-80元预算；并明确描述“牛油锅底口味正宗，能做重辣”。满足重辣和预算约束（轮次[4]）。",
+        "meetExpectation": true
+      },
+      "rubric_4": {
+        "rubric": "动线须覆盖成都城市内跨区玩法，POI 均在该城市",
+        "justification": "所有POI（东湖公园、春熙路、MAO Livehouse）均在成都市内，且从锦江区到武侯区（或其它区）存在跨区移动，满足要求（轮次[4]）。",
+        "meetExpectation": true
+      },
+      "rubric_5": {
+        "rubric": "须给出分时段安排及点间交通或路程依据（路线工具或明确分钟数）",
+        "justification": "方案给出了详细分时段：08:30-11:30东湖公园、11:30-13:30午餐、14:00-18:00春熙路、20:00-22:30Livehouse；每段标注了交通方式（打车/步行）和分钟数（如20分钟、16分钟、17分钟）。满足要求（轮次[4]）。",
+        "meetExpectation": true
+      },
+      "rubric_6": {
+        "rubric": "最终方案须为可照着执行的一日行程，与「朋友3人、Livehouse+街区」目标一致",
+        "justification": "方案针对用户实际提出的4人（用户对话中称4人）设计，包含了Livehouse（MAO）和街区（春熙路、东湖公园），提供了完整时间节点和预算，可照着执行。与整体目标一致（轮次[4]）。",
+        "meetExpectation": true
+      },
+      "rubric_7": {
+        "rubric": "若 Agent 未完成关键约束即声称结束，相关 rubric 不应判为满足",
+        "justification": "Agent未声称结束，而是给出了完整方案。所有关键约束均已满足，该rubric不适用，保持原始false状态（轮次[4]）。",
+        "meetExpectation": false
+      }
+    },
+    "windows": 1,
+    "window_logs": [
+      {
+        "window": 1,
+        "updates": 8
+      }
+    ],
+    "rubric_met": 7,
+    "rubric_total": 8,
+    "usage": {
+      "input": 3106,
+      "output": 2659,
+      "total": 5765,
+      "reasoning": 0,
+      "cacheRead": 0,
+      "runs": 1,
+      "model": "deepseek-v4-flash"
+    }
+  },
+  "first_response": {
+    "score": 75,
+    "reason": "progress_no_timing"
+  },
+  "token_usage": {
+    "user_sim": {
+      "input": 5864,
+      "output": 385,
+      "total": 6249,
+      "reasoning": 0,
+      "cacheRead": 0,
+      "runs": 4,
+      "model": "doubao-seed-2-0-mini-260428"
+    },
+    "judge": {
+      "input": 3106,
+      "output": 2659,
+      "total": 5765,
+      "reasoning": 0,
+      "cacheRead": 0,
+      "runs": 1,
+      "model": "deepseek-v4-flash"
+    }
+  }
+}

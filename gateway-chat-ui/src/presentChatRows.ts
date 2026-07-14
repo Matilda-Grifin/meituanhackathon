@@ -48,6 +48,14 @@ export function isPlanMessage(text: string): boolean {
   if (/##\s*📋|行程速览/.test(t)) return true;
   if (/^#\s*[🗺️🏙️🌙🌧️]/m.test(t) && t.length > 800) return true;
   if (/^#\s+.+/m.test(t) && /##\s*💰|预算参考/.test(t)) return true;
+  // 常见「能照着走」方案：有时刻/表格/高德链接，或一日/半日行程措辞
+  if (
+    t.length >= 600 &&
+    (/行程速览|分时段|一日游|半日|打车约|路线建议/.test(t) || /amap\.com\/place\//i.test(t)) &&
+    (/\d{1,2}[:：]\d{2}/.test(t) || /\|.+\|/.test(t) || /午餐|晚餐|科技馆|博物馆/.test(t))
+  ) {
+    return true;
+  }
   return false;
 }
 
